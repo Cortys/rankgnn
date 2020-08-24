@@ -1,0 +1,5 @@
+networkx==2.5
+pydot==1.4.1
+funcy==1.14
+scikit-learn==0.23.2
+grakel==0.1b7

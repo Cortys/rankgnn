@@ -1,0 +1,12 @@
+target
+bin
+classes
+checkouts
+pom.xml.asc
+*.jar
+*.class
+.lein-*
+.nrepl-port
+
+nomis-ns-graph.png
+.clj-kondo/.cache

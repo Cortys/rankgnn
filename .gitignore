@@ -10,3 +10,4 @@ pom.xml.asc
 
 nomis-ns-graph.png
 .clj-kondo/.cache
+.calva

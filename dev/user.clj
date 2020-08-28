@@ -2,7 +2,8 @@
   (:require [clojure.tools.namespace.repl :as ctnr]
             [clojure.tools.logging :as log]
             [libpython-clj.require :refer [require-python]]
-            [libpython-clj.python :refer [py.]]))
+            [libpython-clj.python :refer [py.]]
+            [oz.core :as oz]))
 
 (require-python '[tensorflow :as tf]
                 '[tensorflow.keras :as keras]
@@ -12,6 +13,7 @@
 (defn start
   []
   (ctnr/set-refresh-dirs "dev" "src" "test")
+  (oz/start-server!)
   (log/info "REPL started."))
 
 (defn refresh
@@ -31,5 +33,5 @@
         x (tf/constant [[0 0] [0 1] [1 0] [1 1]])
         y (tf/constant [0 1 1 0])]
     (py. model compile :optimizer opt :loss "binary_crossentropy" :metrics ["accuracy"])
-    (py. model fit x y :epochs 100)
+    (py. model fit x y :epochs 1000 :verbose 2)
     (py. model predict x)))

@@ -11,3 +11,12 @@ pom.xml.asc
 nomis-ns-graph.png
 .clj-kondo/.cache
 .calva
+.rebl
+
+
+.ipynb_checkpoints
+__pycache__
+/JUPYTER_TOKEN
+/logs*
+/data*
+/evaluations*

@@ -9,6 +9,8 @@
   :main graspe.core
 
   :profiles {:dev {:source-paths ["dev" "src" "test"]
-                   :dependencies [[org.clojure/tools.namespace "1.0.0"]]
+                   :dependencies [[org.clojure/tools.namespace "1.0.0"]
+                                  [metasoarous/oz "1.6.0-alpha25"]
+                                  [ring "1.7.1"]]
                    :repl-options {:init-ns user
                                   :init (start)}}})

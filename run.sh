@@ -32,18 +32,6 @@ ARGS="--rm -it"
 
 if [ "$1" == "detached" ]; then
 	ARGS="-d"
-else
-	if [ "$2" == "detached" ]; then
-		ARGS="-d"
-	fi
-
-	if [ "$1" == "jack" ]; then
-		ARGS="$ARGS -e MODE=jack"
-	elif [ "$1" == "socket" ]; then
-		ARGS="$ARGS -e MODE=socket"
-	elif [ "$1" == "nrepl" ]; then
-		ARGS="$ARGS -e MODE=nrepl"
-	fi
 fi
 
 
@@ -52,11 +40,6 @@ if [ "$REBUILD" == "1" ]; then
 	docker build . -t graspe/graspe -f Dockerfile
 fi
 
-if [ -f "$HOME/.lein/profiles.clj" ]; then
-	ARGS="$ARGS -v $HOME/.lein/profiles.clj:/home/.lein/profiles.clj"
-fi
-
-echo "Clojure nREPL port: $REPL_PORT, Clojure Socket REPL port: $SOCKET_PORT."
 echo "Starting Jupyter at ${JUPYTER_URL} ..."
 echo ""
 
@@ -65,12 +48,9 @@ mkdir -p evaluations
 mkdir -p data
 
 docker run --gpus all --name $GRASPE_CONTAINER_NAME \
-	-p $REPL_PORT:7888 \
-	-p $SOCKET_PORT:5555 \
 	-p $JUPYTER_PORT:8888 \
 	-p 6006:6006 -p 10666:10666 \
 	-v $(pwd):/app \
-	-v $HOME/.m2:/home/.m2 \
  	$ARGS \
 	-u $(id -u):$(id -g) \
 	-e "JUPYTER_TOKEN=$JUPYTER_TOKEN" \

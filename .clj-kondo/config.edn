@@ -1,3 +1,0 @@
-{:lint-as {libpython-clj.require/require-python clojure.core/require
-           libpython-clj.python/py. clojure.core/.
-           libpython-clj.python/py.. clojure.core/..}}

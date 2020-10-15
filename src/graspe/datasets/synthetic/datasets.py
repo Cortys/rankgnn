@@ -7,6 +7,25 @@ import funcy as fy
 
 from graspe.utils import cart, local_seed, unzip
 
+def twothree_dataset():
+  g2 = nx.Graph()
+  g2.add_edge(0, 1)
+
+  g3 = nx.Graph()
+  nx.add_cycle(g3, range(3))
+
+  return [g2, g3], np.array([-1, 1])
+
+def threesix_dataset():
+  g3 = nx.Graph()
+  nx.add_cycle(g3, range(3))
+  nx.add_cycle(g3, range(3, 6))
+
+  g6 = nx.Graph()
+  nx.add_cycle(g6, range(6))
+
+  return [g3, g6], np.array([0, 1])
+
 def noisy_triangle_graph(sl, sr, d, y):
   g = nx.Graph()
   y_not = 1 - y

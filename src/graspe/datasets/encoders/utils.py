@@ -69,3 +69,40 @@ def make_graph_batch(encoded_graphs, ref_keys, masking_fns=None, meta_fns={}):
     **masking_meta,
     **metadata_batch
   }
+
+def make_batch_generator(
+  elements, batcher, batch_size_limit=100,
+  element_space_fn=None, batch_space_limit=None):
+  if batch_size_limit == 1:
+    def batch_generator():
+      for e in elements:
+        yield batcher([e])
+  else:
+    def batch_generator():
+      batch = []
+      batch_size = 0
+      batch_space = 0
+      batch_full = False
+
+      for e in elements:
+        if batch_space_limit is not None:
+          e_space = element_space_fn(e)
+          batch_space += e_space
+
+          if batch_space > batch_space_limit:
+            batch_space = e_space
+            batch_full = True
+
+        if batch_full or batch_size >= batch_size_limit:
+          yield batcher(batch)
+          batch = []
+          batch_size = 0
+          batch_full = False
+
+        batch.append(e)
+        batch_size += 1
+
+      if batch_size > 0:
+        yield batcher(batch)
+
+  return batch_generator

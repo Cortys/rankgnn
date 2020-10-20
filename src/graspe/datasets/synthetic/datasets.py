@@ -26,6 +26,17 @@ def threesix_dataset():
 
   return [g3, g6], np.array([0, 1])
 
+def small_grid_dataset():
+  g10 = nx.grid_graph(dim=(10, 10))
+  g20 = nx.grid_graph(dim=(20, 20))
+  g50 = nx.grid_graph(dim=(50, 50))
+
+  h10 = nx.grid_graph(dim=(5, 20))
+  h20 = nx.grid_graph(dim=(10, 40))
+  h50 = nx.grid_graph(dim=(25, 100))
+
+  return [h10, h20, h50, g10, g20, g50], [0, 0, 0, 1, 1, 1]
+
 def noisy_triangle_graph(sl, sr, d, y):
   g = nx.Graph()
   y_not = 1 - y

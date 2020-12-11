@@ -3,10 +3,11 @@ from tensorflow import keras
 import funcy as fy
 import networkx as nx
 import numpy as np
+import collections
 
 import graspe.datasets.synthetic.datasets as syn
-import graspe.datasets.encoders.wl1 as wl1_enc
-import graspe.datasets.encoders.utils as enc_utils
+import graspe.encoders.wl1 as wl1_enc
+import graspe.encoders.utils as enc_utils
 import graspe.utils as utils
 
 
@@ -19,4 +20,4 @@ encs = fy.lmap(wl1_enc.encode_graph, gs)
 
 encs
 
-list(enc_utils.make_batch_generator(encs, wl1_enc.make_batch, batch_size_limit=4)())
+list(enc_utils.make_batch_generator((encs,ys), wl1_enc.make_batch, batch_size_limit=4)())

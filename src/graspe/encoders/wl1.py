@@ -1,6 +1,6 @@
 import numpy as np
 
-import graspe.datasets.encoders.utils as enc_utils
+import graspe.encoders.utils as enc_utils
 
 def encode_graph(
   g, node_ordering=None,
@@ -52,7 +52,7 @@ def encode_graph(
     ref_a=np.array(ref_a),
     ref_b=np.array(ref_b))
 
-def make_batch(encoded_graphs, masking=True):
+def make_batch(encoded_graphs, masking=False):
   return enc_utils.make_graph_batch(
     encoded_graphs,
     ref_keys=["ref_a", "ref_b"],

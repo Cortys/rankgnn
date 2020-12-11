@@ -1,4 +1,6 @@
 import numpy as np
+import funcy as fy
+from collections.abc import Iterable
 from typing import get_type_hints
 
 def make_graph_batch(encoded_graphs, ref_keys, masking_fns=None, meta_fns={}):
@@ -70,23 +72,52 @@ def make_graph_batch(encoded_graphs, ref_keys, masking_fns=None, meta_fns={}):
     **metadata_batch
   }
 
+def combine_fns(fns, aggregator=tuple, cutoff=False):
+  if fns is None:
+    fns = ()
+  elif not isinstance(fns, Iterable):
+    fns = (fns,)
+
+  fns_len = len(fns)
+
+  def combination(xs):
+    res = aggregator(f(x) for f, x in zip(fns, xs[:fns_len]))
+
+    if not cutoff:
+      res += xs[fns_len:]
+
+    return res
+
+  return combination
+
 def make_batch_generator(
-  elements, batcher, batch_size_limit=100,
+  elements, batcher=None, batch_size_limit=100,
   element_space_fn=None, batch_space_limit=None):
+
+  if not isinstance(elements, tuple):
+    elements = (elements,)
+    batcher = fy.compose(batcher, fy.first)
+  else:
+    batcher = combine_fns(batcher)
+
+  element_space_fn = combine_fns(element_space_fn, sum, True)
+  re = range(len(elements))
+
   if batch_size_limit == 1:
     def batch_generator():
-      for e in elements:
-        yield batcher([e])
+      for e in zip(*elements):
+        yield batcher(tuple(fy.map(lambda x: [x], e)))
   else:
     def batch_generator():
-      batch = []
+      batches = tuple([] for _ in re)
       batch_size = 0
       batch_space = 0
       batch_full = False
 
-      for e in elements:
+      for e in zip(*elements):
         if batch_space_limit is not None:
           e_space = element_space_fn(e)
+          assert e_space <= batch_space_limit
           batch_space += e_space
 
           if batch_space > batch_space_limit:
@@ -94,15 +125,16 @@ def make_batch_generator(
             batch_full = True
 
         if batch_full or batch_size >= batch_size_limit:
-          yield batcher(batch)
-          batch = []
+          yield batcher(batches)
+          batches = tuple([] for _ in re)
           batch_size = 0
           batch_full = False
 
-        batch.append(e)
+        for batch, x in zip(batches, e):
+          batch.append(x)
         batch_size += 1
 
       if batch_size > 0:
-        yield batcher(batch)
+        yield batcher(batches)
 
   return batch_generator

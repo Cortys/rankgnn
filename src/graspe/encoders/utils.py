@@ -1,6 +1,5 @@
 import numpy as np
 import funcy as fy
-from collections.abc import Iterable
 from typing import get_type_hints
 
 def make_graph_batch(encoded_graphs, ref_keys, masking_fns=None, meta_fns={}):
@@ -72,14 +71,45 @@ def make_graph_batch(encoded_graphs, ref_keys, masking_fns=None, meta_fns={}):
     **metadata_batch
   }
 
+def attacher(prop_name, flag=False):
+  def check(f):
+    return hasattr(f, prop_name)
+
+  if flag:
+    def attach(f):
+      f.__dict__[prop_name] = True
+      return f
+
+    return attach, check
+
+  def attach(val):
+    def attacher(f):
+      if val is not None:
+        f.__dict__[prop_name] = val
+      return f
+    return attacher
+
+  def get(f):
+    return getattr(f, prop_name, None)
+
+  return attach, get, check
+
+combined, is_combined = attacher("__combined", True)
+with_preprocessor, get_preprocessor, has_preprocessor = attacher("__preprocessor")
+with_space_fn, get_space_fn, has_space_fn = attacher("__space_fn")
+
 def combine_fns(fns, aggregator=tuple, cutoff=False):
   if fns is None:
     fns = ()
-  elif not isinstance(fns, Iterable):
+  elif callable(fns):
+    if is_combined(fns):
+      return fns
+
     fns = (fns,)
 
   fns_len = len(fns)
 
+  @combined
   def combination(xs):
     res = aggregator(f(x) for f, x in zip(fns, xs[:fns_len]))
 
@@ -93,10 +123,16 @@ def combine_fns(fns, aggregator=tuple, cutoff=False):
 def make_batch_generator(
   elements, batcher=None, batch_size_limit=100,
   element_space_fn=None, batch_space_limit=None):
+  if has_preprocessor(batcher):
+    elements = get_preprocessor(batcher)(elements)
+
+  if element_space_fn is None and has_space_fn(batcher):
+    element_space_fn = get_space_fn(batcher)
 
   if not isinstance(elements, tuple):
     elements = (elements,)
-    batcher = fy.compose(batcher, fy.first)
+    if not is_combined(batcher):
+      batcher = fy.compose(batcher, fy.first)
   else:
     batcher = combine_fns(batcher)
 

@@ -52,12 +52,27 @@ def encode_graph(
     ref_a=np.array(ref_a),
     ref_b=np.array(ref_b))
 
-def make_batch(encoded_graphs, masking=False):
-  return enc_utils.make_graph_batch(
-    encoded_graphs,
-    ref_keys=["ref_a", "ref_b"],
-    masking_fns=dict(
-      ref_a_idx=lambda e: e["ref_a"],
-      ref_b_idx=lambda e: e["ref_b"]) if masking else None,
-    meta_fns=dict(
-      n=lambda e: len(e["X"])))
+def vertex_count(e):
+  return len(e["X"])
+
+def total_count(e):
+  return len(e["X"]) + len(e["ref_a"])
+
+space_fns = dict(
+  vertex_count=vertex_count,
+  total_count=total_count
+)
+
+def make_batcher(masking=False, space_metric="vertex_count"):
+  @enc_utils.with_space_fn(space_fns[space_metric])
+  def batcher(encoded_graphs):
+    return enc_utils.make_graph_batch(
+      encoded_graphs,
+      ref_keys=["ref_a", "ref_b"],
+      masking_fns=dict(
+        ref_a_idx=lambda e: e["ref_a"],
+        ref_b_idx=lambda e: e["ref_b"]) if masking else None,
+      meta_fns=dict(
+        n=vertex_count))
+
+  return batcher

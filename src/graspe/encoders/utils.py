@@ -2,6 +2,9 @@ import numpy as np
 import funcy as fy
 from typing import get_type_hints
 
+import graspe.utils as utils
+import graspe.encoders.batchers as batchers
+
 def make_graph_batch(encoded_graphs, ref_keys, masking_fns=None, meta_fns={}):
   X_batch_size = 0
   ref_batch_size = 0
@@ -71,88 +74,25 @@ def make_graph_batch(encoded_graphs, ref_keys, masking_fns=None, meta_fns={}):
     **metadata_batch
   }
 
-def attacher(prop_name, flag=False):
-  def check(f):
-    return hasattr(f, prop_name)
-
-  if flag:
-    def attach(f):
-      f.__dict__[prop_name] = True
-      return f
-
-    return attach, check
-
-  def attach(val):
-    def attacher(f):
-      if val is not None:
-        f.__dict__[prop_name] = val
-      return f
-    return attacher
-
-  def get(f):
-    return getattr(f, prop_name, None)
-
-  return attach, get, check
-
-combined, is_combined = attacher("__combined", True)
-with_preprocessor, get_preprocessor, has_preprocessor = attacher("__preprocessor")
-with_space_fn, get_space_fn, has_space_fn = attacher("__space_fn")
-
-def combine_fns(fns, aggregator=tuple, cutoff=False):
-  if fns is None:
-    fns = ()
-  elif callable(fns):
-    if is_combined(fns):
-      return fns
-
-    fns = (fns,)
-
-  fns_len = len(fns)
-
-  @combined
-  def combination(xs):
-    res = aggregator(f(x) for f, x in zip(fns, xs[:fns_len]))
-
-    if not cutoff:
-      res += xs[fns_len:]
-
-    return res
-
-  return combination
-
 def make_batch_generator(
-  elements, batcher=None, batch_size_limit=100,
-  element_space_fn=None, batch_space_limit=None):
-  if has_preprocessor(batcher):
-    elements = get_preprocessor(batcher)(elements)
-
-  if element_space_fn is None and has_space_fn(batcher):
-    element_space_fn = get_space_fn(batcher)
-
-  if not isinstance(elements, tuple):
-    elements = (elements,)
-    if not is_combined(batcher):
-      batcher = fy.compose(batcher, fy.first)
-  else:
-    batcher = combine_fns(batcher)
-
-  element_space_fn = combine_fns(element_space_fn, sum, True)
-  re = range(len(elements))
+  elements, batcher=batchers.identity,
+  batch_size_limit=100, batch_space_limit=None):
+  elements = batcher.preprocess(elements)
 
   if batch_size_limit == 1:
     def batch_generator():
-      for e in zip(*elements):
-        yield batcher(tuple(fy.map(lambda x: [x], e)))
+      for e in batcher.iterate(elements):
+        yield batcher.unit_batch(e)
   else:
     def batch_generator():
-      batches = tuple([] for _ in re)
+      batch = batcher.create_aggregator(elements)
       batch_size = 0
       batch_space = 0
       batch_full = False
 
-      for e in zip(*elements):
+      for e in batcher.iterate(elements):
         if batch_space_limit is not None:
-          e_space = element_space_fn(e)
+          e_space = batcher.compute_space(e)
           assert e_space <= batch_space_limit
           batch_space += e_space
 
@@ -161,16 +101,15 @@ def make_batch_generator(
             batch_full = True
 
         if batch_full or batch_size >= batch_size_limit:
-          yield batcher(batches)
-          batches = tuple([] for _ in re)
+          yield batcher.batch(batch)
+          batch = batcher.create_aggregator(elements)
           batch_size = 0
           batch_full = False
 
-        for batch, x in zip(batches, e):
-          batch.append(x)
+        batcher.append(batch, e)
         batch_size += 1
 
       if batch_size > 0:
-        yield batcher(batches)
+        yield batcher.batch(batch)
 
   return batch_generator

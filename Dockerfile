@@ -1,8 +1,4 @@
-FROM tensorflow/tensorflow:2.3.0-gpu-jupyter
-
-RUN apt-get update && \
-	apt-get install -y openjdk-11-jdk libpython3.6 &&\
-	apt-get clean;
+FROM tensorflow/tensorflow:2.4.0-gpu-jupyter
 
 RUN pip3 install jupyter_kernel_gateway jupyterlab
 

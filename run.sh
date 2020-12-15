@@ -6,14 +6,6 @@ if [ -z "$GRASPE_CONTAINER_NAME" ]; then
 	GRASPE_CONTAINER_NAME="graspe"
 fi
 
-if [ -z "$REPL_PORT" ]; then
-	REPL_PORT=7888
-fi
-
-if [ -z "$SOCKET_PORT" ]; then
-	SOCKET_PORT=5555
-fi
-
 if [ -z "$JUPYTER_PORT" ]; then
 	JUPYTER_PORT=8888
 fi

@@ -1,9 +1,5 @@
 import numpy as np
-import funcy as fy
 from typing import get_type_hints
-
-import graspe.utils as utils
-import graspe.encoders.batchers as batchers
 
 def make_graph_batch(encoded_graphs, ref_keys, masking_fns=None, meta_fns={}):
   X_batch_size = 0
@@ -73,43 +69,3 @@ def make_graph_batch(encoded_graphs, ref_keys, masking_fns=None, meta_fns={}):
     **masking_meta,
     **metadata_batch
   }
-
-def make_batch_generator(
-  elements, batcher=batchers.identity,
-  batch_size_limit=100, batch_space_limit=None):
-  elements = batcher.preprocess(elements)
-
-  if batch_size_limit == 1:
-    def batch_generator():
-      for e in batcher.iterate(elements):
-        yield batcher.unit_batch(e)
-  else:
-    def batch_generator():
-      batch = batcher.create_aggregator(elements)
-      batch_size = 0
-      batch_space = 0
-      batch_full = False
-
-      for e in batcher.iterate(elements):
-        if batch_space_limit is not None:
-          e_space = batcher.compute_space(e)
-          assert e_space <= batch_space_limit
-          batch_space += e_space
-
-          if batch_space > batch_space_limit:
-            batch_space = e_space
-            batch_full = True
-
-        if batch_full or batch_size >= batch_size_limit:
-          yield batcher.batch(batch)
-          batch = batcher.create_aggregator(elements)
-          batch_size = 0
-          batch_full = False
-
-        batcher.append(batch, e)
-        batch_size += 1
-
-      if batch_size > 0:
-        yield batcher.batch(batch)
-
-  return batch_generator

@@ -1,7 +1,8 @@
 import numpy as np
 
-import graspe.encoders.utils as enc_utils
-import graspe.encoders.batchers as batchers
+import graspe.preprocessing.utils as enc_utils
+import graspe.preprocessing.batcher as batcher
+import graspe.preprocessing.encoder as encoder
 
 def encode_graph(
   g, node_ordering=None,
@@ -59,17 +60,29 @@ def vertex_count(e):
 def total_count(e):
   return len(e["X"]) + len(e["ref_a"])
 
+
 space_metrics = dict(
   vertex_count=vertex_count,
   total_count=total_count
 )
 
-class WL1Batcher(batchers.Batcher):
+class WL1Encoder(encoder.ObjectEncoder):
+  def __init__(self, node_feature_dim=None, node_label_count=None):
+    self.node_feature_dim = node_feature_dim
+    self.node_label_count = node_label_count
+
+  def encode_element(self, graph):
+    return encode_graph(
+      graph,
+      node_feature_dim=self.node_feature_dim,
+      node_label_count=self.node_label_count)
+
+class WL1Batcher(batcher.Batcher):
   def __init__(self, masking=False, space_metric="vertex_count"):
     self.masking = masking
     self.space_metric = space_metric
 
-  def batch(self, graphs):
+  def finalize(self, graphs):
     return enc_utils.make_graph_batch(
       graphs,
       ref_keys=["ref_a", "ref_b"],

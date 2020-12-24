@@ -1,8 +1,13 @@
 import numpy as np
 
+from graspe.utils import tolerant
 import graspe.preprocessing.utils as enc_utils
 import graspe.preprocessing.batcher as batcher
 import graspe.preprocessing.encoder as encoder
+
+@tolerant
+def feature_dim(node_feature_dim=0, node_label_count=0):
+  return max(node_feature_dim + node_label_count, 1)
 
 def encode_graph(
   g, node_ordering=None,
@@ -67,20 +72,41 @@ space_metrics = dict(
 )
 
 class WL1Encoder(encoder.ObjectEncoder):
-  def __init__(self, node_feature_dim=None, node_label_count=None):
+  name = "wl1"
+
+  def __init__(
+    self, node_feature_dim=None, node_label_count=None, ordered=False):
     self.node_feature_dim = node_feature_dim
     self.node_label_count = node_label_count
+    self.ordered = ordered
 
   def encode_element(self, graph):
+    if self.ordered:
+      graph, node_ordering = graph
+    else:
+      node_ordering = None
+
     return encode_graph(
       graph,
       node_feature_dim=self.node_feature_dim,
-      node_label_count=self.node_label_count)
+      node_label_count=self.node_label_count,
+      node_ordering=node_ordering)
 
 class WL1Batcher(batcher.Batcher):
-  def __init__(self, masking=False, space_metric="vertex_count"):
+  def __init__(self, masking=False, space_metric="vertex_count", **kwargs):
+    super().__init__(**kwargs)
+    assert space_metric in space_metrics, "Unknown WL1 space metric."
     self.masking = masking
     self.space_metric = space_metric
+
+    name = "wl1"
+
+    if self.batch_space_limit is not None:
+      name += f"_{space_metric}_metric"
+    if masking:
+      name += "_masked"
+
+    self.name = name
 
   def finalize(self, graphs):
     return enc_utils.make_graph_batch(

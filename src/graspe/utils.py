@@ -6,6 +6,49 @@ import funcy as fy
 from collections import Sized
 import matplotlib.pyplot as plt
 import networkx as nx
+import inspect
+
+def tolerant(f=None, only_named=True):
+  if f is None:
+    return lambda f: tolerant(f, only_named)
+
+  if hasattr(f, "__tolerant__"):
+    return f
+
+  spec = inspect.getfullargspec(f.__init__ if inspect.isclass(f) else f)
+  f_varargs = spec.varargs is not None
+  f_varkws = spec.varkw is not None
+
+  if (only_named or f_varargs) and f_varkws:
+    return f
+
+  f_args = spec.args
+  f_kwonlyargs = spec.kwonlyargs
+
+  @fy.wraps(f)
+  def wrapper(*args, **kwargs):
+    if not (only_named or f_varargs):
+      args = args[:len(f_args)]
+    if not f_varkws:
+      kwargs = fy.project(kwargs, f_args[len(args):] + f_kwonlyargs)
+
+    return f(*args, **kwargs)
+
+  wrapper.__tolerant__ = True
+
+  return wrapper
+
+
+fully_tolerant = tolerant(only_named=False)
+
+def select_prefixed_keys(map, prefix, include_others=False, target=dict()):
+  for k, v in map.items():
+    if k.startswith(prefix):
+      target[k[len(prefix):]] = v
+    elif include_others:
+      target[k] = v
+
+  return target
 
 class NumpyEncoder(json.JSONEncoder):
   def default(self, obj):
@@ -25,6 +68,7 @@ def statistics(vals, mask_invalid=False):
     return {
       "mean": np.mean(vals_masked),
       "std": np.std(vals_masked),
+      "median": np.median(vals_masked),
       "min": np.min(vals),
       "max": np.max(vals),
       "max_masked": np.max(vals_masked),
@@ -36,6 +80,7 @@ def statistics(vals, mask_invalid=False):
     return {
       "mean": np.mean(vals),
       "std": np.std(vals),
+      "median": np.median(vals),
       "min": np.min(vals),
       "max": np.max(vals),
       "count": len(vals) if isinstance(vals, Sized) else 1

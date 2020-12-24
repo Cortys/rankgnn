@@ -25,6 +25,8 @@ class Encoder(transformer.Transformer):
     return np.asarray(aggregator)
 
 class ObjectEncoder(Encoder):
+  name = "oid"
+
   def preprocess(self, elements):
     return np.asanyarray(elements, dtype=object)
 

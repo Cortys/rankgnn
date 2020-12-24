@@ -1,4 +1,6 @@
 class Transformer:
+  name = "id"
+
   def preprocess(self, elements):
     return elements
 
@@ -37,6 +39,8 @@ class TupleTransformer(Transformer):
 
     self.transformers = transformers
     self.size = size
+    self.names = [t.name for t in transformers]
+    self.name = "-".join(self.names)
 
   def preprocess(self, elements):
     return tup(
@@ -65,18 +69,18 @@ def register_transformer(transformer_cls, tuple_cls):
 
 
 tup = tuple
-def tuple(*transformers, size=2, cls=None):
-  if cls is None and len(transformers) > 0:
-    classes = transformers[0].__class__.__mro__
-    tuple_cls = TupleTransformer
-    for cls in classes:
-      if cls in tuple_transformers:
-        tuple_cls = tuple_transformers[cls]
-        break
-  else:
-    tuple_cls = cls or TupleTransformer
+def tuple(*transformers, size=2, **kwargs):
+  assert len(transformers) > 0, "At least one transformer is required."
+  classes = transformers[0].__class__.__mro__
+  tuple_cls = TupleTransformer
+  for cls in classes:
+    if cls in tuple_transformers:
+      tuple_cls = tuple_transformers[cls]
+      break
 
-  return tuple_cls(*transformers, size=size)
+  return tuple_cls(*transformers, size=size, **kwargs)
 
 def pair(transformer=Transformer.identity):
-  return tuple(transformer, transformer)
+  t = tuple(transformer, transformer)
+  t.name = f"{transformer.name}_pair"
+  return t

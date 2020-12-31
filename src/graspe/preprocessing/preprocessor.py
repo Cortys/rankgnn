@@ -1,4 +1,5 @@
 import funcy as fy
+from collections import defaultdict
 
 from graspe.utils import tolerant, select_prefixed_keys
 import graspe.preprocessing.transformer as transformer
@@ -30,7 +31,6 @@ class Preprocessor:
     self.out_meta = out_meta
     self.in_args = fy.merge(self.in_config, in_meta)
 
-    print(self.in_encoder_gen, self.out_encoder_gen)
     in_enc = tolerant_method(self.in_encoder_gen)(**self.in_args)
 
     if out_meta is None:
@@ -47,23 +47,32 @@ class Preprocessor:
   def preprocessed_name(self):
     return self.encoder.name
 
+  @property
+  def finalized_name(self):
+    if self.slice_after_preprocess:
+      return self.encoder.name + "_sliced"
+    raise Exception("This preprocessor has no post-encoding processing stage.")
+
   def preprocess(self, elements):
     return self.encoder.transform(elements)
 
-  def slice(self, elements, indices):
-    return self.encoder.slice(elements, indices)
+  def slice(self, elements, indices, train_indices=None):
+    if indices is None:
+      return elements
+
+    return self.encoder.slice(elements, indices, train_indices)
 
   def finalize(self, elements):
     return elements
 
-  def transform(self, elements, indices=None):
+  def transform(self, elements, indices=None, train_indices=None):
     if indices is not None and not self.slice_after_preprocess:
-      elements = self.slice(elements, indices)
+      elements = self.slice(elements, indices, train_indices)
 
     elements = self.preprocess(elements)
 
     if indices is not None and self.slice_after_preprocess:
-      elements = self.slice(elements, indices)
+      elements = self.slice(elements, indices, train_indices)
 
     return self.finalize(elements)
 
@@ -90,7 +99,14 @@ class BatchingPreprocessor(Preprocessor):
     return self.batcher.transform(elements)
 
 
-preprocessors = dict()
+preprocessors = defaultdict(dict)
 
 def register_preprocessor(type, enc, preprocessor):
-  pass
+  in_type = type[0]
+  preprocessors[type][enc] = preprocessor
+  preprocessors[in_type][enc] = preprocessor
+
+  return preprocessor
+
+def find_preprocessor(type, enc):
+  return preprocessors[type][enc]

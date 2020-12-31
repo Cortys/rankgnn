@@ -6,7 +6,9 @@ import networkx as nx
 import funcy as fy
 
 from graspe.utils import cart, local_seed, unzip
+from graspe.datasets.synthetic.provider import synthetic_graph_embed_dataset
 
+@synthetic_graph_embed_dataset(type="binary")
 def twothree_dataset():
   g2 = nx.Graph()
   g2.add_edge(0, 1)
@@ -16,6 +18,7 @@ def twothree_dataset():
 
   return [g2, g3], np.array([-1, 1])
 
+@synthetic_graph_embed_dataset(type="binary")
 def threesix_dataset():
   g3 = nx.Graph()
   nx.add_cycle(g3, range(3))
@@ -26,6 +29,7 @@ def threesix_dataset():
 
   return [g3, g6], np.array([0, 1])
 
+@synthetic_graph_embed_dataset(type="binary")
 def small_grid_dataset():
   g10 = nx.grid_graph(dim=(10, 10))
   g20 = nx.grid_graph(dim=(20, 20))
@@ -70,6 +74,7 @@ def noisy_triangle_graph(sl, sr, d, y):
 
   return g, y
 
+@synthetic_graph_embed_dataset(type="binary")
 def triangle_classification_dataset(seed=1337):
   with local_seed(seed):
     sizes = range(3, 10)

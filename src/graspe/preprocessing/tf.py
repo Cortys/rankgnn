@@ -8,6 +8,7 @@ import graspe.preprocessing.preprocessor as preprocessor
 import graspe.preprocessing.batcher as batcher
 import graspe.preprocessing.encoder as encoder
 import graspe.preprocessing.graph.wl1 as wl1_enc
+import graspe.preprocessing.classification as cls_enc
 
 @fully_tolerant
 def wl1(meta):
@@ -39,6 +40,10 @@ def float32(meta):
     "shapes": tf.TensorShape(shape)
   }
 
+@fully_tolerant
+def multiclass(meta):
+  return float32(dict(feature_dim=meta.get("classes", 2)))
+
 def pair(enc):
   @fully_tolerant
   def pair_enc(meta):
@@ -55,7 +60,9 @@ def pair(enc):
 encodings = dict(
   wl1=wl1,
   wl1_pair=pair(wl1),
-  float32=float32
+  float32=float32,
+  binary=float32,
+  multiclass=multiclass
 )
 
 def make_dataset(
@@ -117,10 +124,23 @@ def create_preprocessor(
       out_batcher_gen = out_batcher
 
   preprocessor.register_preprocessor(type, enc, Preprocessor)
-
   return Preprocessor
 
 
 WL1EmbedPreprocessor = create_preprocessor(
   ("graph", "vector"), ("wl1", "float32"),
   wl1_enc.WL1Encoder, wl1_enc.WL1Batcher)
+
+WL1BinaryClassifyPreprocessor = create_preprocessor(
+  ("graph", "binary"), ("wl1", "binary"),
+  wl1_enc.WL1Encoder, wl1_enc.WL1Batcher)
+
+WL1BinaryClassifyPreprocessor = create_preprocessor(
+  ("graph", "binary"), ("wl1", "multiclass"),
+  wl1_enc.WL1Encoder, wl1_enc.WL1Batcher,
+  cls_enc.MulticlassEncoder)
+
+WL1BinaryClassifyPreprocessor = create_preprocessor(
+  ("graph", "class"), ("wl1", "multiclass"),
+  wl1_enc.WL1Encoder, wl1_enc.WL1Batcher,
+  cls_enc.MulticlassEncoder)

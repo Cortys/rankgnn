@@ -50,7 +50,7 @@ def encode_graph(
     i += 1
     X.append(np.concatenate((lab, f)))
 
-  for (a, b) in g.edges():
+  for a, b in g.edges():
     ref_a.append(n_ids[a])
     ref_b.append(n_ids[b])
 

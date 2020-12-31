@@ -15,11 +15,20 @@ import graspe.preprocessing.tf as tf_enc
 import graspe.utils as utils
 import graspe.models.gnn as gnn
 
-dataset = syn.small_grid_dataset()
+dataset = syn.triangle_classification_dataset()
 
-preproc = tf_enc.WL1EmbedPreprocessor(out_meta={}, config=dict(batch_size_limit=2))
-wl1_ds = preproc.transform(dataset)
+wl1_ds = dataset.get_processed(
+  ("wl1", "binary"), config=dict(batch_size_limit=100),
+  shuffle=True)
 
+dataset.in_meta
 list(wl1_ds)
+
+# len(dataset[0])
+#
+# preproc = tf_enc.WL1EmbedPreprocessor(out_meta={}, config=dict(batch_size_limit=100))
+# wl1_ds = preproc.transform(dataset)
+#
+# list(wl1_ds)
 
 #gnn.GIN()

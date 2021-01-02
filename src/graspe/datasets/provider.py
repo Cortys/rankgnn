@@ -1,4 +1,3 @@
-import os
 import pickle
 import json
 import funcy as fy
@@ -181,7 +180,7 @@ class DatasetProvider:
     train_idxs = inner_fold["train"]
     val_idxs = inner_fold["validation"]
     pre = self._get_preprocessor(enc, config)
-    no_validation = config is not None and config["no_validation"]
+    no_validation = config is not None and config.get("no_validation", False)
 
     if no_validation:
       train_idxs = np.concatenate([train_idxs, val_idxs])
@@ -204,6 +203,15 @@ class DatasetProvider:
   def stats(self):
     self._cache_dataset(only_meta=False)
     return self.loader.stats(self._dataset)
+
+  def find_compatible_encoding(self, input_encodings, output_encodings):
+    compatible_encodings = preproc.find_encodings(self.dataset_type)
+    in_set = set(input_encodings)
+    out_set = set(output_encodings)
+
+    return fy.filter(
+      lambda enc: enc[0] in in_set and enc[1] in out_set,
+      compatible_encodings)
 
 
 def cache(f, file, format="pickle"):

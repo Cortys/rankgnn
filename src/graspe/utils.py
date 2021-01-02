@@ -10,16 +10,16 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import inspect
 
-def tolerant(f=None, only_named=True):
+def tolerant(f=None, only_named=True, ignore_varkwargs=False):
   if f is None:
-    return lambda f: tolerant(f, only_named)
+    return lambda f: tolerant(f, only_named, ignore_varkwargs)
 
   if hasattr(f, "__tolerant__"):
     return f
 
   spec = inspect.getfullargspec(f.__init__ if inspect.isclass(f) else f)
   f_varargs = spec.varargs is not None
-  f_varkws = spec.varkw is not None
+  f_varkws = not ignore_varkwargs and spec.varkw is not None
 
   if (only_named or f_varargs) and f_varkws:
     return f

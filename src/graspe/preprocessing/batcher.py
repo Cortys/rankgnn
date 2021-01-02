@@ -1,5 +1,3 @@
-import numpy as np
-
 import graspe.preprocessing.transformer as transformer
 
 class Batcher(transformer.Transformer):

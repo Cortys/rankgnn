@@ -1,12 +1,8 @@
 import tensorflow as tf
 import tensorflow.keras as keras
-import numpy as np
 
 from graspe.utils import fully_tolerant
-import graspe.preprocessing.utils as enc_utils
 import graspe.preprocessing.preprocessor as preprocessor
-import graspe.preprocessing.batcher as batcher
-import graspe.preprocessing.encoder as encoder
 import graspe.preprocessing.graph.wl1 as wl1_enc
 import graspe.preprocessing.classification as cls_enc
 
@@ -88,9 +84,10 @@ def make_inputs(enc, meta={}):
   shapes = enc["shapes"]
   ks = types.keys()
 
-  return tuple(
-    keras.Input(name=k, dtype=types[k], shape=tuple(shapes[k].as_list()))
-    for k in ks)
+  return {
+    k: keras.Input(
+      name=k, dtype=types[k], shape=tuple(shapes[k].as_list()[1:]))
+    for k in ks}
 
 class TFPreprocessor(preprocessor.BatchingPreprocessor):
   enc = None

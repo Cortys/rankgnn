@@ -19,11 +19,21 @@ if [ ! -z "$(docker ps -aqf "name=^$GRASPE_CONTAINER_NAME\$")" ]; then
 fi
 
 TF_FORCE_GPU_ALLOW_GROWTH=true
-REBUILD="1"
+REBUILD="0"
 ARGS="--rm -it"
 
-if [ "$1" == "detached" ]; then
+if [ "$1" == "rebuild" ]; then
+	REBUILD="1"
+
+	if [ "$2" == "detached" ]; then
+		ARGS="-d"
+	fi
+elif [ "$1" == "detached" ]; then
 	ARGS="-d"
+
+	if [ "$2" == "rebuild" ]; then
+		REBUILD="1"
+	fi
 fi
 
 
@@ -38,6 +48,7 @@ echo ""
 mkdir -p logs
 mkdir -p evaluations
 mkdir -p data
+mkdir -p raw
 
 docker run --gpus all --name $GRASPE_CONTAINER_NAME \
 	-p $JUPYTER_PORT:8888 \

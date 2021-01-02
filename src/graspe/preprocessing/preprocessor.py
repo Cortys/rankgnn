@@ -108,5 +108,8 @@ def register_preprocessor(type, enc, preprocessor):
 
   return preprocessor
 
+def find_encodings(type):
+  return preprocessors[type].keys()
+
 def find_preprocessor(type, enc):
   return preprocessors[type][enc]

@@ -19,4 +19,5 @@ __pycache__
 /JUPYTER_TOKEN
 /logs*
 /data*
+/raw*
 /evaluations*

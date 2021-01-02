@@ -15,20 +15,26 @@ import graspe.preprocessing.tf as tf_enc
 import graspe.utils as utils
 import graspe.models.gnn as gnn
 
-dataset = syn.triangle_classification_dataset()
+# -%% codecell
 
-wl1_ds = dataset.get_processed(
-  ("wl1", "binary"), config=dict(batch_size_limit=100),
-  shuffle=True)
+provider = syn.threesix_dataset()
 
-dataset.in_meta
-list(wl1_ds)
+provider.in_meta
+provider.dataset_size
 
-# len(dataset[0])
-#
-# preproc = tf_enc.WL1EmbedPreprocessor(out_meta={}, config=dict(batch_size_limit=100))
-# wl1_ds = preproc.transform(dataset)
-#
-# list(wl1_ds)
+# -%% codecell
 
-#gnn.GIN()
+in_enc, out_enc = fy.first(provider.find_compatible_encoding(gnn.GIN.input_encodings, gnn.GIN.output_encodings))
+
+model = gnn.GIN(in_enc=in_enc, out_enc=out_enc, in_meta=provider.in_meta, out_meta=provider.out_meta, conv_layer_units=[32, 64, 32], fc_layer_units=[32, 1], activation="sigmoid")
+# ds_train, ds_val, ds_test = provider.get_processed_split((in_enc, out_enc), config=dict(batch_size_limit=100))
+ds_train = provider.get_processed((in_enc, out_enc))
+ds_val, ds_test = ds_train, ds_train
+opt = keras.optimizers.Adam(0.0001)
+
+model.compile(optimizer=opt, loss="binary_crossentropy", metrics=["binary_accuracy"])
+model.fit(ds_train, validation_data=ds_val, epochs=1000, verbose=2)
+model.predict(ds_test)
+list(ds_test)[0][1]
+model.evaluate(ds_test)
+list(ds_train)[0]

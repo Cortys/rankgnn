@@ -17,7 +17,7 @@ import graspe.models.gnn as gnn
 
 # -%% codecell
 
-provider = syn.threesix_dataset()
+provider = syn.triangle_classification_dataset()
 
 provider.in_meta
 provider.dataset_size
@@ -26,10 +26,10 @@ provider.dataset_size
 
 in_enc, out_enc = fy.first(provider.find_compatible_encoding(gnn.GIN.input_encodings, gnn.GIN.output_encodings))
 
-model = gnn.GIN(in_enc=in_enc, out_enc=out_enc, in_meta=provider.in_meta, out_meta=provider.out_meta, conv_layer_units=[32, 64, 32], fc_layer_units=[32, 1], activation="sigmoid")
-# ds_train, ds_val, ds_test = provider.get_processed_split((in_enc, out_enc), config=dict(batch_size_limit=100))
-ds_train = provider.get_processed((in_enc, out_enc))
-ds_val, ds_test = ds_train, ds_train
+model = gnn.GIN(in_enc=in_enc, out_enc=out_enc, in_meta=provider.in_meta, out_meta=provider.out_meta, conv_layer_units=[32, 32, 32], fc_layer_units=[32, 1], activation="sigmoid")
+ds_train, ds_val, ds_test = provider.get_processed_split((in_enc, out_enc), config=dict(batch_size_limit=100))
+# ds_train = provider.get_processed((in_enc, out_enc))
+# ds_val, ds_test = ds_train, ds_train
 opt = keras.optimizers.Adam(0.0001)
 
 model.compile(optimizer=opt, loss="binary_crossentropy", metrics=["binary_accuracy"])

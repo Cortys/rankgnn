@@ -40,7 +40,7 @@ class GINLayer(keras.layers.Layer):
     X = input["X"]
     ref_a = input["ref_a"]
     ref_b = input["ref_b"]
-    X_agg = wl1_convolution(X, ref_a, ref_b)
+    X_agg = X + wl1_convolution(X, ref_a, ref_b)
 
     X_hid = tf.matmul(X_agg, self.W_hidden)
     if self.use_bias:
@@ -52,9 +52,13 @@ class GINLayer(keras.layers.Layer):
 
     return {**input, "X": X_out}
 
-def wl1_convolution(X, ref_a, ref_b):
-  X_a = tf.gather(X, ref_a, axis=0)
+def wl1_convolution(X, ref_a, ref_b, directed=False):
   X_shape = tf.shape(X)
-  backref = tf.expand_dims(ref_b, axis=-1)
-  X_agg = tf.scatter_nd(backref, X_a, shape=X_shape)
+  X_a = tf.gather(X, ref_a, axis=0)
+  idx_b = tf.expand_dims(ref_b, axis=-1)
+  X_agg = tf.scatter_nd(idx_b, X_a, shape=X_shape)
+  if not directed:
+    X_b = tf.gather(X, ref_b, axis=0)
+    idx_a = tf.expand_dims(ref_a, axis=-1)
+    X_agg += tf.scatter_nd(idx_a, X_b, shape=X_shape)
   return X_agg

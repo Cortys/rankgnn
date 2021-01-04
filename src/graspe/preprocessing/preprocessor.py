@@ -112,4 +112,7 @@ def find_encodings(type):
   return preprocessors[type].keys()
 
 def find_preprocessor(type, enc):
+  if enc is None:
+    return Preprocessor
+
   return preprocessors[type][enc]

@@ -148,8 +148,8 @@ class DatasetProvider:
     self, pre: preproc.Preprocessor, ds, indices, train_indices, index_id):
     return pre.transform(ds, indices, train_indices)
 
-  def get_processed(
-    self, enc, config=None,
+  def get(
+    self, enc=None, config=None,
     indices=None, train_indices=None,
     preprocessor=None,
     shuffle=False,
@@ -170,10 +170,12 @@ class DatasetProvider:
 
     return self._preprocess(preprocessor, ds, indices, train_indices, index_id)
 
-  def get_processed_split(
-    self, enc, config=None, outer_idx=None, inner_idx=None):
+  def get_split(
+    self, enc=None, config=None, outer_idx=None, inner_idx=None, only=None):
     outer_idx = outer_idx or 0
     inner_idx = inner_idx or 0
+    assert (outer_idx == 0 or outer_idx < self.outer_k) \
+        and (inner_idx == 0 or inner_idx < self.inner_k)
     split = self.splits[outer_idx]
     inner_fold = split["model_selection"][inner_idx]
     test_idxs = split["test"]
@@ -185,20 +187,44 @@ class DatasetProvider:
     if no_validation:
       train_idxs = np.concatenate([train_idxs, val_idxs])
 
-    train_ds = self.get_processed(
-      enc, indices=train_idxs, preprocessor=pre,
-      index_id=(outer_idx, inner_idx, "train"))
-    test_ds = self.get_processed(
-      enc, indices=test_idxs, train_indices=train_idxs,
-      preprocessor=pre, index_id=(outer_idx, inner_idx, "test"))
+    if only is None or only == "train":
+      train_ds = self.get(
+        enc, indices=train_idxs, preprocessor=pre,
+        index_id=(outer_idx, inner_idx, "train"))
+      if only == "train":
+        return train_ds
+
+    if only is None or only == "test":
+      test_ds = self.get(
+        enc, indices=test_idxs, train_indices=train_idxs,
+        preprocessor=pre, index_id=(outer_idx, inner_idx, "test"))
+      if only == "test":
+        return test_ds
 
     if not no_validation:
-      val_ds = self.get_processed(
+      val_ds = self.get(
         enc, indices=train_idxs, train_indices=train_idxs,
         preprocessor=pre, index_id=(outer_idx, inner_idx, "val"))
-      return train_ds, val_ds, test_ds
+      if only is None:
+        return train_ds, val_ds, test_ds
+      elif only == "val":
+        return val_ds
+      raise AssertionError(f"Invalid only-selector: {only}.")
     else:
+      assert only is None, f"Invalid only-selector: {only}."
       return train_ds, test_ds
+
+  def get_train_split(
+    self, enc=None, config=None, outer_idx=None, inner_idx=None):
+    return self.get_split(enc, config, outer_idx, inner_idx, "train")
+
+  def get_validation_split(
+    self, enc=None, config=None, outer_idx=None, inner_idx=None):
+    return self.get_split(enc, config, outer_idx, inner_idx, "val")
+
+  def get_test_split(
+    self, enc=None, config=None, outer_idx=None, inner_idx=None):
+    return self.get_split(enc, config, outer_idx, inner_idx, "test")
 
   def stats(self):
     self._cache_dataset(only_meta=False)
@@ -294,23 +320,36 @@ class PresplitDatasetProvider(DatasetProvider):
     self, loader_train, loader_val=None, loader_test=None, name_suffix=""):
     super().__init__(
       loader.PresplitDatasetLoader(loader_train, loader_val, loader_test),
+      outer_k=None,
       name_suffix=name_suffix)
 
   def _make_splits(self):
     raise Exception("This dataset has fixed train, val and test splits.")
 
-  def get_processed(self, *args, **kwargs):
+  def get(self, *args, **kwargs):
     raise Exception("Presplit datasets cannot be resliced.")
 
-  def get_processed_split(self, enc, config, outer_idx=None, inner_idx=None):
+  def get_split(
+    self, enc=None, config=None, outer_idx=None, inner_idx=None, only=None):
     ds = self.dataset
     pre = self._get_preprocessor(enc, config)
-    train_ds = self._preprocess(pre, ds["train"], None, None, ("train",))
+    if only is None or only == "train":
+      train_ds = self._preprocess(pre, ds["train"], None, None, ("train",))
+      if only == "train":
+        return train_ds
+
     res = (train_ds,)
 
-    if self.loader.val:
-      res += (self._preprocess(pre, ds["val"], None, None, ("val")),)
-    if self.loader.train:
-      res += (self._preprocess(pre, ds["train"], None, None, ("train")),)
+    if self.loader.val and (only is None or only == "val"):
+      val_ds = self._preprocess(pre, ds["val"], None, None, ("val",))
+      if only == "val":
+        return val_ds
+      res += (val_ds,)
+    if self.loader.test and (only is None or only == "test"):
+      test_ds = self._preprocess(pre, ds["test"], None, None, ("test",))
+      if only == "test":
+        return test_ds
+      res += (test_ds,)
 
+    assert only is None, f"Invalid only-selector: {only}."
     return res

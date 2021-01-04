@@ -4,6 +4,7 @@ import tensorflow.keras as keras
 from graspe.utils import fully_tolerant
 import graspe.preprocessing.preprocessor as preprocessor
 import graspe.preprocessing.graph.wl1 as wl1_enc
+import graspe.preprocessing.graph.wl2 as wl2_enc
 import graspe.preprocessing.classification as cls_enc
 
 @fully_tolerant
@@ -22,6 +23,29 @@ def wl1(meta):
       "X": tf.TensorShape([None, feature_dim]),
       "ref_a": tf.TensorShape([None]),
       "ref_b": tf.TensorShape([None]),
+      "graph_idx": tf.TensorShape([None]),
+      "n": tf.TensorShape([None]),
+    }
+  }
+
+@fully_tolerant
+def wl2(meta):
+  feature_dim = wl2_enc.feature_dim(**meta)
+
+  return {
+    "types": {
+      "X": tf.float32,
+      "ref_a": tf.int32,
+      "ref_b": tf.int32,
+      "backref": tf.int32,
+      "graph_idx": tf.int32,
+      "n": tf.int32,
+    },
+    "shapes": {
+      "X": tf.TensorShape([None, feature_dim]),
+      "ref_a": tf.TensorShape([None]),
+      "ref_b": tf.TensorShape([None]),
+      "backref": tf.TensorShape([None]),
       "graph_idx": tf.TensorShape([None]),
       "n": tf.TensorShape([None]),
     }
@@ -56,6 +80,8 @@ def pair(enc):
 encodings = dict(
   wl1=wl1,
   wl1_pair=pair(wl1),
+  wl2=wl2,
+  wl2_pair=pair(wl2),
   float32=float32,
   binary=float32,
   multiclass=multiclass
@@ -123,21 +149,22 @@ def create_preprocessor(
   preprocessor.register_preprocessor(type, enc, Preprocessor)
   return Preprocessor
 
+def create_graph_preprocessors(name, encoder, batcher):
+  create_preprocessor(
+    ("graph", "vector"), (name, "float32"),
+    encoder, batcher)
+  create_preprocessor(
+    ("graph", "binary"), (name, "binary"),
+    encoder, batcher)
+  create_preprocessor(
+    ("graph", "binary"), (name, "multiclass"),
+    encoder, batcher,
+    cls_enc.MulticlassEncoder)
+  create_preprocessor(
+    ("graph", "class"), (name, "multiclass"),
+    encoder, batcher,
+    cls_enc.MulticlassEncoder)
 
-WL1EmbedPreprocessor = create_preprocessor(
-  ("graph", "vector"), ("wl1", "float32"),
-  wl1_enc.WL1Encoder, wl1_enc.WL1Batcher)
 
-WL1BinaryClassifyPreprocessor = create_preprocessor(
-  ("graph", "binary"), ("wl1", "binary"),
-  wl1_enc.WL1Encoder, wl1_enc.WL1Batcher)
-
-WL1BinaryClassifyPreprocessor = create_preprocessor(
-  ("graph", "binary"), ("wl1", "multiclass"),
-  wl1_enc.WL1Encoder, wl1_enc.WL1Batcher,
-  cls_enc.MulticlassEncoder)
-
-WL1BinaryClassifyPreprocessor = create_preprocessor(
-  ("graph", "class"), ("wl1", "multiclass"),
-  wl1_enc.WL1Encoder, wl1_enc.WL1Batcher,
-  cls_enc.MulticlassEncoder)
+create_graph_preprocessors("wl1", wl1_enc.WL1Encoder, wl1_enc.WL1Batcher)
+create_graph_preprocessors("wl2", wl2_enc.WL2Encoder, wl2_enc.WL2Batcher)

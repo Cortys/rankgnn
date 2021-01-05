@@ -51,7 +51,9 @@ def experiment(provider, model):
   t = time_str()
   log_dir = f"../logs/{t}_{m.name}_{provider.name}/"
   tb = keras.callbacks.TensorBoard(
-    log_dir=log_dir)
+    log_dir=log_dir,
+    histogram_freq=50,
+    profile_batch="1,100")
 
   m.fit(ds_train, validation_data=ds_val,
     epochs=5000, verbose=2,

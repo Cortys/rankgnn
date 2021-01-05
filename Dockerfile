@@ -1,6 +1,6 @@
 FROM tensorflow/tensorflow:2.4.0-gpu-jupyter
 
-RUN pip3 install jupyter_kernel_gateway jupyterlab
+RUN pip3 install jupyter_kernel_gateway jupyterlab tensorboard_plugin_profile==2.4.0
 
 ADD requirements.txt requirements.txt
 RUN pip3 install -r requirements.txt

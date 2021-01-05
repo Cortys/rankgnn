@@ -3,7 +3,10 @@ import collections as coll
 
 from graspe.utils import tolerant, select_prefixed_keys
 
-def pipeline_step(f):
+def pipeline_step(f=None, macro=False):
+  if f is None:
+    return lambda f: pipeline_step(f, macro)
+
   if hasattr(f, "__pipeline_step__"):
     return f
 
@@ -18,7 +21,12 @@ def pipeline_step(f):
       if prefix is not None:
         select_prefixed_keys(kwargs2, prefix + "_", target=kwargs)
 
-      return f(input, *args, **kwargs)
+      res = f(input, *args, **kwargs)
+
+      if macro:
+        return create_pipeline(res)(input, **kwargs)
+      else:
+        return res
 
     execute.__tolerant__ = True
 
@@ -52,7 +60,7 @@ def to_executable_step(f):
       for s in f]
 
     def split_step(input, **kwargs):
-      return [p(input, **kwargs) for p in pipelines]
+      return tuple(p(input, **kwargs) for p in pipelines)
 
     return split_step
 

@@ -15,7 +15,10 @@ def model_inputs(f):
 
   return pipeline.pipeline_start(wrapper)
 
-def model_step(f):
+def model_step(f=None, macro=False):
+  if f is None:
+    return lambda f: model_step(f, macro)
+
   f = pipeline.tolerant(f)
 
   @fy.wraps(f)
@@ -23,11 +26,14 @@ def model_step(f):
     inputs, outputs = io
     new_outputs = f(outputs, *args, **kwargs)
 
-    return inputs, new_outputs
+    if macro:
+      return new_outputs
+    else:
+      return inputs, new_outputs
 
   wrapper.__tolerant__ = True
 
-  return pipeline.pipeline_step(wrapper)
+  return pipeline.pipeline_step(wrapper, macro)
 
 def validate_model_encs(input_encodings, output_encodings):
   def validator(input, in_enc=None, out_enc=None):
@@ -125,10 +131,11 @@ def with_layer(io, layer, with_inputs=False, **kwargs):
   return input, pipeline.tolerant(layer)(**kwargs)(output)
 
 @pipeline.pipeline_step
-def merge_ios(ios):
+def merge_ios(ios, merger=tuple):
+  assert len(ios) > 0
   input = ios[0][0]
 
-  return input, tuple(output for _, output in ios)
+  return input, merger(output for _, output in ios)
 
 # Layer Stack Transformers:
 

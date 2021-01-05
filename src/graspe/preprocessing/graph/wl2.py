@@ -45,7 +45,6 @@ def encode_graph(
   e_ids = {e: i for i, e in enumerate(g_p.edges)}
   i = 0
   for edge in g_p.edges:
-    print(i, edge)
     a, b = edge
     neighbors = list(nx.common_neighbors(g_p, a, b))
     n_count = len(neighbors)
@@ -64,16 +63,20 @@ def encode_graph(
       ref_a.append(i)
       ref_b.append(i)
       n_count += 1
-    elif g.has_edge(a, b):
-      X[i, 1] = 1
-      d = g.edges[edge]
-      if edge_label_count > 0:
-        label = I_e[d.get("label", 0) - 1]
-        X[i, edge_label_offset:edge_feature_offset] = label
-      if edge_feature_dim > 0:
-        X[i, edge_feature_offset:X_dim] = d["features"]
     else:
-      X[i, 2] = 1
+      if g.has_edge(a, b):
+        X[i, 1] = 1
+        d = g.edges[edge]
+        if edge_label_count > 0:
+          label = I_e[d.get("label", 0) - 1]
+          X[i, edge_label_offset:edge_feature_offset] = label
+        if edge_feature_dim > 0:
+          X[i, edge_feature_offset:X_dim] = d["features"]
+      else:
+        X[i, 2] = 1
+      ref_a += [i, eid_lookup(e_ids, a, a)]
+      ref_b += [eid_lookup(e_ids, b, b), i]
+      n_count += 2
 
     ref_a += n_a
     ref_b += n_b
@@ -119,7 +122,7 @@ class WL2Encoder(encoder.ObjectEncoder):
     return encode_graph(
       graph, self.radius,
       self.node_feature_dim, self.node_label_count,
-      self.eedge_feature_dim, self.edge_label_count)
+      self.edge_feature_dim, self.edge_label_count)
 
 class WL2Batcher(batcher.Batcher):
   def __init__(self, space_metric="embeddings_count", **kwargs):

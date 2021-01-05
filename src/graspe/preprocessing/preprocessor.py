@@ -65,7 +65,8 @@ class Preprocessor:
   def finalize(self, elements):
     return elements
 
-  def transform(self, elements, indices=None, train_indices=None):
+  def transform(
+    self, elements, indices=None, train_indices=None, finalize=True):
     if indices is not None and not self.slice_after_preprocess:
       elements = self.slice(elements, indices, train_indices)
 
@@ -74,7 +75,7 @@ class Preprocessor:
     if indices is not None and self.slice_after_preprocess:
       elements = self.slice(elements, indices, train_indices)
 
-    return self.finalize(elements)
+    return self.finalize(elements) if finalize else elements
 
 class BatchingPreprocessor(Preprocessor):
   in_batcher_gen = lambda **kwargs: tolerant(batcher.Batcher)(**kwargs)

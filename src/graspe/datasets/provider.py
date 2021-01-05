@@ -145,15 +145,16 @@ class DatasetProvider:
       self.in_meta, self.out_meta, config)
 
   def _preprocess(
-    self, pre: preproc.Preprocessor, ds, indices, train_indices, index_id):
-    return pre.transform(ds, indices, train_indices)
+    self, pre: preproc.Preprocessor, ds, indices, train_indices,
+    index_id, finalize=True):
+    return pre.transform(ds, indices, train_indices, finalize)
 
   def get(
     self, enc=None, config=None,
     indices=None, train_indices=None,
     preprocessor=None,
     shuffle=False,
-    index_id=None):
+    index_id=None, finalize=True):
     if preprocessor is None:
       preprocessor = self._get_preprocessor(enc, config)
     ds = self.dataset
@@ -168,10 +169,12 @@ class DatasetProvider:
         index_id = ()
       index_id += ("shuffled",)
 
-    return self._preprocess(preprocessor, ds, indices, train_indices, index_id)
+    return self._preprocess(
+      preprocessor, ds, indices, train_indices, index_id, finalize)
 
   def get_split(
-    self, enc=None, config=None, outer_idx=None, inner_idx=None, only=None):
+    self, enc=None, config=None, outer_idx=None, inner_idx=None,
+    only=None, finalize=True):
     outer_idx = outer_idx or 0
     inner_idx = inner_idx or 0
     assert (outer_idx == 0 or outer_idx < self.outer_k) \
@@ -190,21 +193,21 @@ class DatasetProvider:
     if only is None or only == "train":
       train_ds = self.get(
         enc, indices=train_idxs, preprocessor=pre,
-        index_id=(outer_idx, inner_idx, "train"))
+        index_id=(outer_idx, inner_idx, "train"), finalize=finalize)
       if only == "train":
         return train_ds
 
     if only is None or only == "test":
       test_ds = self.get(
-        enc, indices=test_idxs, train_indices=train_idxs,
-        preprocessor=pre, index_id=(outer_idx, inner_idx, "test"))
+        enc, indices=test_idxs, train_indices=train_idxs, preprocessor=pre,
+        index_id=(outer_idx, inner_idx, "test"), finalize=finalize)
       if only == "test":
         return test_ds
 
     if not no_validation:
       val_ds = self.get(
-        enc, indices=train_idxs, train_indices=train_idxs,
-        preprocessor=pre, index_id=(outer_idx, inner_idx, "val"))
+        enc, indices=train_idxs, train_indices=train_idxs, preprocessor=pre,
+        index_id=(outer_idx, inner_idx, "val"), finalize=finalize)
       if only is None:
         return train_ds, val_ds, test_ds
       elif only == "val":
@@ -215,16 +218,19 @@ class DatasetProvider:
       return train_ds, test_ds
 
   def get_train_split(
-    self, enc=None, config=None, outer_idx=None, inner_idx=None):
-    return self.get_split(enc, config, outer_idx, inner_idx, "train")
+    self, enc=None, config=None,
+    outer_idx=None, inner_idx=None, finalize=True):
+    return self.get_split(enc, config, outer_idx, inner_idx, "train", finalize)
 
   def get_validation_split(
-    self, enc=None, config=None, outer_idx=None, inner_idx=None):
-    return self.get_split(enc, config, outer_idx, inner_idx, "val")
+    self, enc=None, config=None,
+    outer_idx=None, inner_idx=None, finalize=True):
+    return self.get_split(enc, config, outer_idx, inner_idx, "val", finalize)
 
   def get_test_split(
-    self, enc=None, config=None, outer_idx=None, inner_idx=None):
-    return self.get_split(enc, config, outer_idx, inner_idx, "test")
+    self, enc=None, config=None,
+    outer_idx=None, inner_idx=None, finalize=True):
+    return self.get_split(enc, config, outer_idx, inner_idx, "test", finalize)
 
   def stats(self):
     self._cache_dataset(only_meta=False)
@@ -286,7 +292,8 @@ class CachingDatasetProvider(DatasetProvider):
     return super()._make_splits()
 
   def _preprocess(
-    self, pre: preproc.Preprocessor, ds, indices, train_indices, index_id):
+    self, pre: preproc.Preprocessor, ds, indices, train_indices,
+    index_id, finalize=True):
     suffix = "" if index_id is None else "_" + "_".join(
       fy.map(str, index_id))
 
@@ -306,9 +313,9 @@ class CachingDatasetProvider(DatasetProvider):
       if indices is not None and pre.slice_after_preprocess:
         ds = pre.slice(ds, indices, train_indices)
 
-      return pre.finalize(ds)
+      return pre.finalize(ds) if finalize else ds
 
-    if pre.finalized_cacheable:
+    if finalize and pre.finalized_cacheable:
       finalized_dir = utils.make_dir(self.data_dir / pre.finalized_name)
       finalized_file = finalized_dir / f"{self.name}{suffix}.pickle"
       return cache(lambda: preproc(ds), finalized_file)
@@ -330,23 +337,27 @@ class PresplitDatasetProvider(DatasetProvider):
     raise Exception("Presplit datasets cannot be resliced.")
 
   def get_split(
-    self, enc=None, config=None, outer_idx=None, inner_idx=None, only=None):
+    self, enc=None, config=None, outer_idx=None, inner_idx=None,
+    only=None, finalize=True):
     ds = self.dataset
     pre = self._get_preprocessor(enc, config)
     if only is None or only == "train":
-      train_ds = self._preprocess(pre, ds["train"], None, None, ("train",))
+      train_ds = self._preprocess(
+        pre, ds["train"], None, None, ("train",), finalize)
       if only == "train":
         return train_ds
 
     res = (train_ds,)
 
     if self.loader.val and (only is None or only == "val"):
-      val_ds = self._preprocess(pre, ds["val"], None, None, ("val",))
+      val_ds = self._preprocess(
+        pre, ds["val"], None, None, ("val",), finalize)
       if only == "val":
         return val_ds
       res += (val_ds,)
     if self.loader.test and (only is None or only == "test"):
-      test_ds = self._preprocess(pre, ds["test"], None, None, ("test",))
+      test_ds = self._preprocess(
+        pre, ds["test"], None, None, ("test",), finalize)
       if only == "test":
         return test_ds
       res += (test_ds,)

@@ -40,25 +40,24 @@ class GINLayer(keras.layers.Layer):
     X = input["X"]
     ref_a = input["ref_a"]
     ref_b = input["ref_b"]
-    X_agg = X + wl1_convolution(X, ref_a, ref_b)
+    X_agg = wl1_convolution(X, X, ref_a, ref_b)
 
-    X_hid = tf.matmul(X_agg, self.W_hidden)
+    X_hid = X_agg @ self.W_hidden
     if self.use_bias:
       X_hid = tf.nn.bias_add(X_hid, self.b_hidden)
-    X_out = tf.matmul(X_hid, self.W_out)
+    X_out = X_hid @ self.W_out
     if self.use_bias:
       X_out = tf.nn.bias_add(X_out, self.b_out)
     X_out = self.activation(X_out)
 
     return {**input, "X": X_out}
 
-def wl1_convolution(X, ref_a, ref_b, directed=False):
-  X_shape = tf.shape(X)
+def wl1_convolution(X_agg, X, ref_a, ref_b, directed=False):
   X_a = tf.gather(X, ref_a, axis=0)
   idx_b = tf.expand_dims(ref_b, axis=-1)
-  X_agg = tf.scatter_nd(idx_b, X_a, shape=X_shape)
+  X_agg = tf.tensor_scatter_nd_add(X_agg, idx_b, X_a)
   if not directed:
     X_b = tf.gather(X, ref_b, axis=0)
     idx_a = tf.expand_dims(ref_a, axis=-1)
-    X_agg += tf.scatter_nd(idx_a, X_b, shape=X_shape)
+    X_agg = tf.tensor_scatter_nd_add(X_agg, idx_a, X_b)
   return X_agg

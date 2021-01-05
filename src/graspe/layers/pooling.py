@@ -9,7 +9,6 @@ class AvgPooling(keras.layers.Layer):
     X = input["X"]
     graph_idx = input["graph_idx"]
     N = tf.shape(input["n"])[0]
-    y = tf.math.unsorted_segment_mean(
-      X, graph_idx, num_segments=N)
+    y = tf.math.unsorted_segment_mean(X, graph_idx, num_segments=N)
 
     return y

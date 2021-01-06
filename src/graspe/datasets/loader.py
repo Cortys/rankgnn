@@ -1,4 +1,7 @@
 from abc import ABC, abstractmethod
+from pathlib import Path
+
+RAW_ROOT = Path("../raw/")
 
 class DatasetLoader(ABC):
   dataset_type = None

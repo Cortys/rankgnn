@@ -1,5 +1,6 @@
 from abc import abstractmethod
 import funcy as fy
+import numpy as np
 
 import graspe.utils as utils
 import graspe.datasets.provider as provider
@@ -59,7 +60,7 @@ class SyntheticGraphEmbedDatasetLoader(SyntheticDatasetLoader):
     return len(elements[0])
 
   def compute_stratify_labels(self, elements):
-    return elements[1]
+    return np.array(elements[1])
 
 class SyntheticGraphEmbedDatasetProvider(SyntheticDatasetProvider):
   loaderClass = SyntheticGraphEmbedDatasetLoader
@@ -70,7 +71,7 @@ def synthetic_dataset_decorator(cls):
       return lambda f: dataset_decorator(f, **config)
 
     res = fy.func_partial(cls, f, config)
-    res.original_function = f
+    res.__original__ = f
     return res
 
   return dataset_decorator

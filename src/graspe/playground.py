@@ -7,6 +7,7 @@ import collections
 from datetime import datetime
 
 import graspe.datasets.synthetic.datasets as syn
+import graspe.datasets.tu.datasets as tu
 import graspe.preprocessing.utils as enc_utils
 import graspe.preprocessing.graph.wl1 as wl1_enc
 import graspe.preprocessing.transformer as transformer
@@ -57,14 +58,15 @@ def experiment(provider, model):
 
   m.fit(
     ds_train.cache(),
-    validation_data=ds_val,
+    validation_data=ds_val.cache(),
     epochs=5000, verbose=2,
     callbacks=[tb])
   m.evaluate(ds_test)
-  print(np.around(m.predict(ds_test).numpy(), 2))
+  print(np.around(m.predict(ds_test), 2))
   print(targets)
 
 
-provider = syn.triangle_classification_dataset()
-model = gnn.WL2GNN
+# provider = syn.triangle_classification_dataset()
+provider = tu.Mutag()
+model = gnn.GIN
 experiment(provider, model)

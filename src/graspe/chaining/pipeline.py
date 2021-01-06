@@ -3,9 +3,9 @@ import collections as coll
 
 from graspe.utils import tolerant, select_prefixed_keys
 
-def pipeline_step(f=None, macro=False):
+def pipeline_step(f=None, macro=False, share_prefix=False):
   if f is None:
-    return lambda f: pipeline_step(f, macro)
+    return lambda f: pipeline_step(f, macro, share_prefix)
 
   if hasattr(f, "__pipeline_step__"):
     return f
@@ -21,7 +21,10 @@ def pipeline_step(f=None, macro=False):
       if prefix is not None:
         select_prefixed_keys(kwargs2, prefix + "_", target=kwargs)
 
-      res = f(input, *args, **kwargs)
+      if share_prefix:
+        res = f(input, *args, prefix=prefix, **kwargs)
+      else:
+        res = f(input, *args, **kwargs)
 
       if macro:
         return create_pipeline(res)(input, **kwargs)

@@ -90,20 +90,22 @@ class WL1Encoder(encoder.ObjectEncoder):
       node_ordering=node_ordering)
 
 class WL1Batcher(batcher.Batcher):
+  name = "wl1"
+
   def __init__(self, masking=False, space_metric="embeddings_count", **kwargs):
     super().__init__(**kwargs)
     assert space_metric in space_metrics, "Unknown WL1 space metric."
     self.masking = masking
     self.space_metric = space_metric
 
-    name = "wl1"
-
+    suffix = ""
     if self.batch_space_limit is not None:
-      name += f"_{space_metric}_metric"
+      suffix += f"_{space_metric}_metric"
     if masking:
-      name += "_masked"
+      suffix += "_masked"
 
-    self.name = name
+    self.name += suffix
+    self.basename += suffix
 
   def finalize(self, graphs):
     return enc_utils.make_graph_batch(

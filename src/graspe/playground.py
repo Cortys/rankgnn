@@ -40,9 +40,9 @@ def experiment(provider, model):
     targets = provider.dataset[1]
   else:
     ds_train, ds_val, ds_test = provider.get_split(
-      enc, config=dict(batch_size_limit=228),
+      enc, config=dict(lazy_batching=False),
       outer_idx=5)
-    targets = provider.get_test_split()[1]
+    targets = provider.get_test_split(outer_idx=5)[1]
 
   opt = keras.optimizers.Adam(0.0001)
   m.compile(
@@ -53,13 +53,16 @@ def experiment(provider, model):
   tb = keras.callbacks.TensorBoard(
     log_dir=log_dir,
     histogram_freq=50,
-    profile_batch="1,100")
+    profile_batch="100,115")
 
-  m.fit(ds_train, validation_data=ds_val,
+  m.fit(
+    ds_train.cache(),
+    validation_data=ds_val,
     epochs=5000, verbose=2,
     callbacks=[tb])
   m.evaluate(ds_test)
-  print(m.predict(ds_test), targets)
+  print(np.around(m.predict(ds_test).numpy(), 2))
+  print(targets)
 
 
 provider = syn.triangle_classification_dataset()

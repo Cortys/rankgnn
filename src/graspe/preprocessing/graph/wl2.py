@@ -107,6 +107,8 @@ space_metrics = dict(
 )
 
 class WL2Encoder(encoder.ObjectEncoder):
+  name = "wl2"
+
   def __init__(
     self, radius=1,
     node_feature_dim=0, node_label_count=0,
@@ -125,14 +127,16 @@ class WL2Encoder(encoder.ObjectEncoder):
       self.edge_feature_dim, self.edge_label_count)
 
 class WL2Batcher(batcher.Batcher):
+  name = "wl2"
+
   def __init__(self, space_metric="embeddings_count", **kwargs):
     super().__init__(**kwargs)
     assert space_metric in space_metrics, "Unknown WL2 space metric."
     self.space_metric = space_metric
     if self.batch_space_limit is not None:
-      self.name = f"wl2_{space_metric}_metric"
-    else:
-      self.name = "wl2"
+      suffix = f"_{space_metric}_metric"
+      self.name += suffix
+      self.basename += suffix
 
   def finalize(self, graphs):
     return enc_utils.make_graph_batch(

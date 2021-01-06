@@ -246,48 +246,21 @@ class DatasetProvider:
       compatible_encodings)
 
 
-def cache(f, file, format="pickle"):
-  if file.exists():
-    with open(file, "rb" if format == "pickle" else "r") as f:
-      if format == "pickle":
-        return pickle.load(f)
-      elif format == "json":
-        return json.load(f, cls=utils.NumpyDecoder)
-      else:
-        raise Exception(f"Unknown format '{format}'.")
-
-  res = f()
-
-  with open(file, "wb" if format == "pickle" else "w") as f:
-    if format == "pickle":
-      pickle.dump(res, f)
-    elif format == "json":
-      json.dump(res, f, cls=utils.NumpyEncoder)
-
-  return res
-
-def cached_method(dir_name, suffix="", format="pickle"):
-  def cache_annotator(m):
-    @fy.wraps(m)
-    def cached_m(self, *args, **kwargs):
-      dir = utils.make_dir(self.data_dir / dir_name)
-      cache_file = dir / f"{self.name}{suffix}.{format}"
-      return cache(lambda: m(self, *args, **kwargs), cache_file, format)
-    return cached_m
-  return cache_annotator
-
 class CachingDatasetProvider(DatasetProvider):
   root_dir = CACHE_ROOT
 
-  def __init__(self, *args, **kwargs):
+  def __init__(
+    self, *args, preprocessed_cache=True, finalize_cache=False, **kwargs):
     super().__init__(*args, **kwargs)
+    self.preprocessed_cache = preprocessed_cache
+    self.finalize_cache = finalize_cache
     self.data_dir = utils.make_dir(self.root_dir / self.full_name)
 
-  @cached_method("processed")
+  @utils.cached_method("processed")
   def _load_dataset(self, only_meta=True):
     return super()._load_dataset(only_meta=False)  # always load the elements
 
-  @cached_method("processed", suffix="_splits", format="json")
+  @utils.cached_method("processed", suffix="_splits", format="json")
   def _make_splits(self):
     return super()._make_splits()
 
@@ -296,29 +269,39 @@ class CachingDatasetProvider(DatasetProvider):
     index_id, finalize=True):
     suffix = "" if index_id is None else "_" + "_".join(
       fy.map(str, index_id))
+    preprocessed_cache = pre.preprocessed_cacheable and self.preprocessed_cache
+    preprocessed_dir = self.data_dir / pre.preprocessed_name
+    if preprocessed_cache:
+      utils.make_dir(preprocessed_dir)
+    preprocessed_format = pre.preprocessed_format or "pickle"
 
     def preproc(ds):
-      preprocess_dir = utils.make_dir(self.data_dir / pre.preprocessed_name)
       if indices is not None and not pre.slice_after_preprocess:
         ds = pre.slice(ds, indices, train_indices)
-        preprocess_file = preprocess_dir / f"{self.name}{suffix}.pickle"
+        preprocess_file = preprocessed_dir / \
+            f"{self.name}{suffix}.{preprocessed_format}"
       else:
-        preprocess_file = preprocess_dir / f"{self.name}.pickle"
+        preprocess_file = preprocessed_dir / \
+            f"{self.name}.{preprocessed_format}"
 
-      if not pre.preprocessed_cacheable:
-        ds = pre.preprocess(ds)
+      if preprocessed_cache:
+        ds = utils.cache(lambda: pre.preprocess(ds), preprocess_file)
       else:
-        ds = cache(lambda: pre.preprocess(ds), preprocess_file)
+        ds = pre.preprocess(ds)
 
       if indices is not None and pre.slice_after_preprocess:
         ds = pre.slice(ds, indices, train_indices)
 
       return pre.finalize(ds) if finalize else ds
 
-    if finalize and pre.finalized_cacheable:
-      finalized_dir = utils.make_dir(self.data_dir / pre.finalized_name)
-      finalized_file = finalized_dir / f"{self.name}{suffix}.pickle"
-      return cache(lambda: preproc(ds), finalized_file)
+    if finalize and pre.finalized_cacheable and self.finalize_cache:
+      finalized_dir = utils.make_dir(
+        preprocessed_dir / f"final-{pre.finalized_name}")
+      finalized_format = pre.finalized_format or "pickle"
+      finalized_file = finalized_dir / \
+          f"{self.name}{suffix}.{finalized_format}"
+      return utils.cache(
+        lambda: preproc(ds), finalized_file, finalized_format)
     else:
       return preproc(ds)
 

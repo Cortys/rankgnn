@@ -14,6 +14,8 @@ class Preprocessor:
   slice_after_preprocess = True
   preprocessed_cacheable = True
   finalized_cacheable = False
+  preprocessed_format = None
+  finalized_format = None
 
   in_encoder_gen = lambda: encoder.Encoder.identity
   out_encoder_gen = in_encoder_gen
@@ -99,6 +101,9 @@ class BatchingPreprocessor(Preprocessor):
   def finalize(self, elements):
     return self.batcher.transform(elements)
 
+class DefaultPreprocessor(Preprocessor):
+  preprocessed_cacheable = False
+
 
 preprocessors = defaultdict(dict)
 
@@ -114,6 +119,6 @@ def find_encodings(type):
 
 def find_preprocessor(type, enc):
   if enc is None:
-    return Preprocessor
+    return DefaultPreprocessor
 
   return preprocessors[type][enc]

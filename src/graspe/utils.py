@@ -9,6 +9,7 @@ from collections import Sized
 import matplotlib.pyplot as plt
 import networkx as nx
 import inspect
+import pickle
 
 def tolerant(f=None, only_named=True, ignore_varkwargs=False):
   if f is None:
@@ -249,3 +250,61 @@ def make_dir(dir):
     os.makedirs(dir)
 
   return dir
+
+
+cache_format_types = {"binary", "text", "custom"}
+
+def cache_format(loader, dumper, type="binary"):
+  assert type in cache_format_types
+
+  class CacheFormat:
+    type = type
+    load = staticmethod(loader)
+    dump = staticmethod(dumper)
+
+  return CacheFormat
+
+
+cache_formats = dict(
+  pickle=pickle,
+  json=cache_format(
+    fy.partial(json.load, cls=NumpyDecoder),
+    fy.partial(json.dump, cls=NumpyEncoder),
+    type="text")
+)
+
+def register_cache_format(format, load, dump, type="binary"):
+  cache_formats[format] = cache_format(load, dump, type)
+  return format
+
+def cache(f, file, format="pickle"):
+  assert format in cache_formats, f"Unknown format '{format}'."
+  cache_format = cache_formats[format]
+  type = "binary" if format == "pickle" else cache_format.type
+
+  if file.exists():
+    if type == "custom":
+      return cache_format(file)
+    else:
+      with open(file, "rb" if type == "binary" else "r") as f:
+        return cache_format.load(f)
+
+  res = f()
+
+  if type == "custom":
+    cache_format.dump(res, file)
+  else:
+    with open(file, "wb" if type == "binary" else "w") as f:
+      cache_format.dump(res, f)
+
+  return res
+
+def cached_method(dir_name, suffix="", format="pickle"):
+  def cache_annotator(m):
+    @fy.wraps(m)
+    def cached_m(self, *args, **kwargs):
+      dir = make_dir(self.data_dir / dir_name)
+      cache_file = dir / f"{self.name}{suffix}.{format}"
+      return cache(lambda: m(self, *args, **kwargs), cache_file, format)
+    return cached_m
+  return cache_annotator

@@ -1,4 +1,5 @@
 from abc import abstractmethod
+import funcy as fy
 
 import graspe.utils as utils
 import graspe.datasets.provider as provider
@@ -29,8 +30,9 @@ class SyntheticDatasetLoader(loader.DatasetLoader):
       size=self.compute_size(elements),
       stratify_labels=self.compute_stratify_labels(elements))
 
-class SyntheticDatasetProvider(provider.DatasetProvider):
+class SyntheticDatasetProvider(provider.CachingDatasetProvider):
   loaderClass = SyntheticDatasetLoader
+  root_dir = provider.CACHE_ROOT / "synthetic"
 
   def __init__(self, generator, config, *args, **kwargs):
     loader = self.loaderClass(generator, config)
@@ -62,18 +64,17 @@ class SyntheticGraphEmbedDatasetLoader(SyntheticDatasetLoader):
 class SyntheticGraphEmbedDatasetProvider(SyntheticDatasetProvider):
   loaderClass = SyntheticGraphEmbedDatasetLoader
 
-def synthetic_graph_embed_dataset(cached=True, **config):
-  def dataset_decorator(f):
-    if cached:
-      class Provider(
-        SyntheticGraphEmbedDatasetProvider, provider.CachingDatasetProvider):
-        root_dir = provider.CACHE_ROOT / "synthetic"
-    else:
-      Provider = SyntheticGraphEmbedDatasetProvider
+def synthetic_dataset_decorator(cls):
+  def dataset_decorator(f=None, **config):
+    if f is None:
+      return lambda f: dataset_decorator(f, **config)
 
-    res = lambda *args, **kwargs: Provider(f, config, *args, **kwargs)
+    res = fy.func_partial(cls, f, config)
     res.original_function = f
-
     return res
 
   return dataset_decorator
+
+
+synthetic_graph_embed_dataset = synthetic_dataset_decorator(
+  SyntheticGraphEmbedDatasetProvider)

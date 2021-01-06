@@ -1,6 +1,7 @@
 import tensorflow as tf
 import tensorflow.keras as keras
 
+import graspe.utils as utils
 from graspe.utils import fully_tolerant
 import graspe.preprocessing.preprocessor as preprocessor
 import graspe.preprocessing.graph.wl1 as wl1_enc
@@ -12,20 +13,11 @@ def wl1(meta):
   feature_dim = wl1_enc.feature_dim(**meta)
 
   return {
-    "types": {
-      "X": tf.float32,
-      "ref_a": tf.int32,
-      "ref_b": tf.int32,
-      "graph_idx": tf.int32,
-      "n": tf.int32,
-    },
-    "shapes": {
-      "X": tf.TensorShape([None, feature_dim]),
-      "ref_a": tf.TensorShape([None]),
-      "ref_b": tf.TensorShape([None]),
-      "graph_idx": tf.TensorShape([None]),
-      "n": tf.TensorShape([None]),
-    }
+    "X": tf.TensorSpec(shape=[None, feature_dim], dtype=tf.float32),
+    "ref_a": tf.TensorSpec(shape=[None], dtype=tf.int32),
+    "ref_b": tf.TensorSpec(shape=[None], dtype=tf.int32),
+    "graph_idx": tf.TensorSpec(shape=[None], dtype=tf.int32),
+    "n": tf.TensorSpec(shape=[None], dtype=tf.int32),
   }
 
 @fully_tolerant
@@ -33,32 +25,19 @@ def wl2(meta):
   feature_dim = wl2_enc.feature_dim(**meta)
 
   return {
-    "types": {
-      "X": tf.float32,
-      "ref_a": tf.int32,
-      "ref_b": tf.int32,
-      "backref": tf.int32,
-      "graph_idx": tf.int32,
-      "n": tf.int32,
-    },
-    "shapes": {
-      "X": tf.TensorShape([None, feature_dim]),
-      "ref_a": tf.TensorShape([None]),
-      "ref_b": tf.TensorShape([None]),
-      "backref": tf.TensorShape([None]),
-      "graph_idx": tf.TensorShape([None]),
-      "n": tf.TensorShape([None]),
-    }
+    "X": tf.TensorSpec(shape=[None, feature_dim], dtype=tf.float32),
+    "ref_a": tf.TensorSpec(shape=[None], dtype=tf.int32),
+    "ref_b": tf.TensorSpec(shape=[None], dtype=tf.int32),
+    "backref": tf.TensorSpec(shape=[None], dtype=tf.int32),
+    "graph_idx": tf.TensorSpec(shape=[None], dtype=tf.int32),
+    "n": tf.TensorSpec(shape=[None], dtype=tf.int32),
   }
 
 @fully_tolerant
 def float32(meta):
   shape = [None, meta["feature_dim"]] if "feature_dim" in meta else [None]
 
-  return {
-    "types": tf.float32,
-    "shapes": tf.TensorShape(shape)
-  }
+  return tf.TensorSpec(shape=shape, dtype=tf.float32)
 
 @fully_tolerant
 def multiclass(meta):
@@ -67,13 +46,8 @@ def multiclass(meta):
 def pair(enc):
   @fully_tolerant
   def pair_enc(meta):
-    encoding = enc(meta)
-
-    return {
-      "types": (encoding["types"], encoding["types"]),
-      "shapes": (encoding["shapes"], encoding["shapes"])
-    }
-
+    signature = enc(meta)
+    return signature, signature
   return pair_enc
 
 
@@ -88,35 +62,45 @@ encodings = dict(
 )
 
 def make_dataset(
-  batch_generator, in_enc, in_meta=None, out_enc=None, out_meta=None):
-  input_enc = encodings[in_enc](in_meta)
+  batch_generator, in_enc, in_meta=None, out_enc=None, out_meta=None,
+  lazy_batching=True):
+  input_sig = encodings[in_enc](in_meta)
 
   if out_enc is None:
-    types = input_enc["types"]
-    shapes = input_enc["shapes"]
+    signature = input_sig
   else:
-    output_enc = encodings[out_enc](out_meta)
-    types = (input_enc["types"], output_enc["types"])
-    shapes = (input_enc["shapes"], output_enc["shapes"])
+    output_sig = encodings[out_enc](out_meta)
+    signature = (input_sig, output_sig)
+
+  if lazy_batching:
+    gen = batch_generator
+  else:
+    batches = list(batch_generator())
+    gen = lambda: batches
 
   return tf.data.Dataset.from_generator(
-    batch_generator,
-    output_types=types,
-    output_shapes=shapes)
+    gen, output_signature=signature)
 
 def make_inputs(enc, meta={}):
-  enc = encodings[enc](meta)
-  types = enc["types"]
-  shapes = enc["shapes"]
-  ks = types.keys()
+  spec = encodings[enc](meta)
 
   return {
     k: keras.Input(
-      name=k, dtype=types[k], shape=tuple(shapes[k].as_list()[1:]))
-    for k in ks}
+      name=k, dtype=s.dtype, shape=tuple(s.shape.as_list()[1:]))
+    for k, s in spec.items()}
+
+def load_tfrecords(file):
+  return tf.data.TFRecordDataset([str(file)])
+
+def dump_tfrecords(dataset, file):
+  writer = tf.data.experimental.TFRecordWriter(str(file))
+  writer.write(dataset.map(tf.io.serialize_tensor))
 
 class TFPreprocessor(preprocessor.BatchingPreprocessor):
   enc = None
+  finalized_cacheable = False  # Not working yet
+  finalized_format = utils.register_cache_format(
+    "tfrecords", load_tfrecords, dump_tfrecords, type="custom")
 
   def finalize(self, elements):
     batch_gen = self.batcher.batch_generator(elements)
@@ -127,7 +111,8 @@ class TFPreprocessor(preprocessor.BatchingPreprocessor):
     return make_dataset(
       batch_gen,
       in_enc, self.in_args,
-      out_enc, self.out_args)
+      out_enc, self.out_args,
+      self.batcher.lazy_batching)
 
 def create_preprocessor(
   type, enc,

@@ -1,14 +1,19 @@
 import graspe.preprocessing.transformer as transformer
 
 class Batcher(transformer.Transformer):
-  def __init__(self, batch_size_limit=None, batch_space_limit=None, **kwargs):
+  def __init__(
+    self, batch_size_limit=None, batch_space_limit=None,
+    lazy_batching=True, **kwargs):
     super().__init__()
 
     self.batch_size_limit = batch_size_limit
     self.batch_space_limit = batch_space_limit
+    self.lazy_batching = lazy_batching
     self.basename = self.name
-    name = f"{self.name}_size{batch_size_limit}"
+    name = self.name
 
+    if batch_size_limit is not None:
+      name += f"_size{batch_size_limit}"
     if batch_space_limit is not None:
       name += f"_space{batch_space_limit}"
 
@@ -66,7 +71,8 @@ class Batcher(transformer.Transformer):
     return batch_generator
 
   def transform(self, elements):
-    return list(self.batch_generator(elements))
+    gen = self.batch_generator(elements)
+    return gen() if self.lazy_batching else list(self.gen())
 
 class TupleBatcher(transformer.TupleTransformer, Batcher):
   def __init__(self, *batchers, size=2, **kwargs):
@@ -92,10 +98,14 @@ class TupleBatcher(transformer.TupleTransformer, Batcher):
       "batch_space_limit", batch_space_limit)
     self.space_limiting_batchers = space_limiting_batchers
     base = "-".join(b.basename for b in batchers)
-    name = f"{base}-size{self.batch_size_limit}"
+    name = base
+    sep = "-"
 
+    if self.batch_size_limit is not None:
+      name += f"{sep}size{self.batch_size_limit}"
+      sep = "_"
     if len(space_limiting_batchers) > 0:
-      name += "_space{self.batch_space_limit}"
+      name += f"{sep}space{self.batch_space_limit}"
 
     self.name = name
 

@@ -22,7 +22,7 @@ import graspe.models.gnn as gnn
 def time_str():
   return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
-def experiment(provider, model):
+def experiment(provider, model, **config):
   enc = fy.first(provider.find_compatible_encoding(
     model.input_encodings, model.output_encodings))
   in_enc, out_enc = enc
@@ -41,10 +41,11 @@ def experiment(provider, model):
     targets = provider.dataset[1]
   else:
     ds_train, ds_val, ds_test = provider.get_split(
-      enc, config=dict(lazy_batching=False),
+      enc, config=config,
       outer_idx=5)
     targets = provider.get_test_split(outer_idx=5)[1]
 
+  provider.unload_dataset()
   opt = keras.optimizers.Adam(0.0001)
   m.compile(
     optimizer=opt, loss="binary_crossentropy", metrics=["binary_accuracy"])
@@ -67,6 +68,7 @@ def experiment(provider, model):
 
 
 # provider = syn.triangle_classification_dataset()
-provider = tu.Mutag()
+provider = tu.ZINC()
 model = gnn.GIN
-experiment(provider, model)
+experiment(provider, model, batch_size_limit=100)
+# provider.dataset

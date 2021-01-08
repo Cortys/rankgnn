@@ -1,4 +1,4 @@
-from graspe.datasets.tu.provider import tu_dataset
+from graspe.datasets.tu.provider import tu_dataset, presplit_tu_dataset
 
 # Binary:
 Mutag = tu_dataset("MUTAG", type="binary")
@@ -11,3 +11,8 @@ IMDBBinary = tu_dataset("IMDB-BINARY", type="binary")
 # Multiclass:
 Reddit5K = tu_dataset("REDDIT-MULTI-5K", type="multiclass", classes=5)
 IMDBMulti = tu_dataset("IMDB-MULTI", type="multiclass", classes=3)
+
+# Regression:
+ZINC = presplit_tu_dataset(
+  "ZINC", "ZINC_train", "ZINC_val", "ZINC_test",
+  type="vector")

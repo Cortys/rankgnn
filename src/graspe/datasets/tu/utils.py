@@ -6,6 +6,7 @@ def parse_tu_data(name, raw_dir):
   indicator_path = raw_dir / name / f'{name}_graph_indicator.txt'
   edges_path = raw_dir / name / f'{name}_A.txt'
   graph_labels_path = raw_dir / name / f'{name}_graph_labels.txt'
+  graph_attributes_path = raw_dir / name / f'{name}_graph_attributes.txt'
   node_labels_path = raw_dir / name / f'{name}_node_labels.txt'
   edge_labels_path = raw_dir / name / f'{name}_edge_labels.txt'
   node_attrs_path = raw_dir / name / f'{name}_node_attributes.txt'
@@ -77,20 +78,27 @@ def parse_tu_data(name, raw_dir):
         edge_attrs[graph_id].append(edge_attr)
         edge_feature_dim = edge_attr.shape[0]
 
-  graph_labels = []
-  with open(graph_labels_path, "r") as f:
-    for i, line in enumerate(f.readlines(), 1):
-      line = line.rstrip("\n")
-      target = int(line)
-      if target == -1:
-        graph_labels.append(0)
-      else:
-        graph_labels.append(target)
+  graph_targets = []
+  if graph_labels_path.exists():
+    with open(graph_labels_path, "r") as f:
+      for i, line in enumerate(f.readlines(), 1):
+        line = line.rstrip("\n")
+        target = int(line)
+        if target == -1:
+          graph_targets.append(0)
+        else:
+          graph_targets.append(target)
 
-    # Shift by one to the left.
-    # Apparently this is necessary for multiclass tasks.
-    if min(graph_labels) == 1:
-      graph_labels = [lab - 1 for lab in graph_labels]
+      # Shift by one to the left.
+      # Apparently this is necessary for multiclass tasks.
+      if min(graph_targets) == 1:
+        graph_targets = [lab - 1 for lab in graph_targets]
+  else:
+    with open(graph_attributes_path, "r") as f:
+      for i, line in enumerate(f.readlines(), 1):
+        line = line.rstrip("\n")
+        target = float(line)
+        graph_targets.append(target)
 
   node_label_count = (
     max(unique_node_labels) if unique_node_labels != set() else 0)
@@ -106,7 +114,7 @@ def parse_tu_data(name, raw_dir):
   return {
     "graph_nodes": graph_nodes,
     "graph_edges": graph_edges,
-    "graph_labels": graph_labels,
+    "graph_targets": graph_targets,
     "node_labels": node_labels,
     "node_attrs": node_attrs,
     "edge_labels": edge_labels,

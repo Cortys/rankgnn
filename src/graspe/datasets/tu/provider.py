@@ -47,7 +47,7 @@ class TUDatasetLoader(loader.DatasetLoader):
 
   def load_dataset(self, only_meta=True):
     graphs_data, in_meta = self._parse_tu_data()
-    targets = graphs_data.pop("graph_labels")
+    targets = graphs_data.pop("graph_targets")
     graphs, out_targets = [], []
 
     for i, target in enumerate(targets, 1):
@@ -75,5 +75,25 @@ class TUDatasetProvider(provider.CachingDatasetProvider):
     self.name = name
     super().__init__(loader, *args, **kwargs)
 
+class PresplitTUDatasetProvider(
+  provider.PresplitDatasetProvider, provider.CachingDatasetProvider):
+  root_dir = provider.CACHE_ROOT / "tu"
+
+  def __init__(self, name, name_train, name_val, name_test, config, **kwargs):
+    loader_train = TUDatasetLoader(name_train, config)
+    loader_val = TUDatasetLoader(name_val, config)
+    loader_test = TUDatasetLoader(name_test, config)
+    self.name = name
+    super().__init__(
+      loader_train=loader_train,
+      loader_val=loader_val,
+      loader_test=loader_test,
+      **kwargs)
+
 def tu_dataset(name, **config):
   return fy.func_partial(TUDatasetProvider, name, config)
+
+def presplit_tu_dataset(name, name_train, name_val, name_test, **config):
+  return fy.func_partial(
+    PresplitTUDatasetProvider,
+    name, name_train, name_val, name_test, config)

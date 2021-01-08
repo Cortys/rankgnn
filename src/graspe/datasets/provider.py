@@ -82,6 +82,9 @@ class DatasetProvider:
 
     return self._dataset
 
+  def unload_dataset(self):
+    self._dataset = None
+
   def __make_holdout_split(self, idxs, strat_labels=None):
     if self.holdout_size == 0:
       return idxs, [], strat_labels
@@ -143,9 +146,9 @@ class DatasetProvider:
       self.in_meta, self.out_meta, config)
 
   def _preprocess(
-    self, pre: preproc.Preprocessor, ds, indices, train_indices,
+    self, pre: preproc.Preprocessor, ds_get, indices, train_indices,
     index_id, finalize=True):
-    return pre.transform(ds, indices, train_indices, finalize)
+    return pre.transform(ds_get(), indices, train_indices, finalize)
 
   def get(
     self, enc=None, config=None,
@@ -155,7 +158,6 @@ class DatasetProvider:
     index_id=None, finalize=True):
     if preprocessor is None:
       preprocessor = self._get_preprocessor(enc, config)
-    ds = self.dataset
 
     if shuffle:
       if indices is None:
@@ -168,7 +170,8 @@ class DatasetProvider:
       index_id += ("shuffled",)
 
     return self._preprocess(
-      preprocessor, ds, indices, train_indices, index_id, finalize)
+      preprocessor, lambda: self.dataset,
+      indices, train_indices, index_id, finalize)
 
   def get_split(
     self, enc=None, config=None, outer_idx=None, inner_idx=None,
@@ -263,7 +266,7 @@ class CachingDatasetProvider(DatasetProvider):
     return super()._make_splits()
 
   def _preprocess(
-    self, pre: preproc.Preprocessor, ds, indices, train_indices,
+    self, pre: preproc.Preprocessor, ds_get, indices, train_indices,
     index_id, finalize=True):
     suffix = "" if index_id is None else "_" + "_".join(
       fy.map(str, index_id))
@@ -273,7 +276,8 @@ class CachingDatasetProvider(DatasetProvider):
       utils.make_dir(preprocessed_dir)
     preprocessed_format = pre.preprocessed_format or "pickle"
 
-    def preproc(ds):
+    def preproc():
+      ds = ds_get()
       if indices is not None and not pre.slice_after_preprocess:
         ds = pre.slice(ds, indices, train_indices)
         preprocess_file = preprocessed_dir / \
@@ -299,17 +303,58 @@ class CachingDatasetProvider(DatasetProvider):
       finalized_file = finalized_dir / \
           f"{self.name}{suffix}.{finalized_format}"
       return utils.cache(
-        lambda: preproc(ds), finalized_file, finalized_format)
+        preproc, finalized_file, finalized_format)
     else:
-      return preproc(ds)
+      return preproc()
 
 class PresplitDatasetProvider(DatasetProvider):
   def __init__(
-    self, loader_train, loader_val=None, loader_test=None, name_suffix=""):
+    self, loader_train, loader_val=None, loader_test=None, **kwargs):
     super().__init__(
       loader.PresplitDatasetLoader(loader_train, loader_val, loader_test),
-      outer_k=None,
-      name_suffix=name_suffix)
+      outer_k=None, inner_k=None, **kwargs)
+
+  @property
+  def in_meta(self):
+    self._cache_dataset()
+    return self._dataset["train"]["in_meta"]
+
+  @property
+  def out_meta(self):
+    self._cache_dataset()
+    return self._dataset["train"]["out_meta"]
+
+  @property
+  def full_name(self):
+    return self.name + self.name_suffix
+
+  @property
+  def dataset(self):
+    self._cache_dataset(only_meta=False)
+    ds = self._dataset
+    return dict(
+      train=ds["train"]["elements"],
+      val=ds["val"]["elements"] if "val" in ds else None,
+      test=ds["test"]["elements"] if "test" in ds else None
+    )
+
+  @property
+  def dataset_split_sizes(self):
+    self._cache_dataset()
+    ds = self._dataset
+    return dict(
+      train=ds["train"]["size"],
+      val=ds["val"]["size"] if "val" in ds else None,
+      test=ds["test"]["size"] if "test" in ds else None
+    )
+
+  @property
+  def dataset_size(self):
+    return sum(fy.keep(self.dataset_split_sizes.values()))
+
+  @property
+  def stratify_labels(self):
+    raise Exception("This dataset has fixed train, val and test splits.")
 
   def _make_splits(self):
     raise Exception("This dataset has fixed train, val and test splits.")
@@ -322,23 +367,24 @@ class PresplitDatasetProvider(DatasetProvider):
     only=None, finalize=True):
     ds = self.dataset
     pre = self._get_preprocessor(enc, config)
+    res = ()
     if only is None or only == "train":
       train_ds = self._preprocess(
-        pre, ds["train"], None, None, ("train",), finalize)
+        pre, lambda: ds["train"], None, None, ("train",), finalize)
       if only == "train":
         return train_ds
-
-    res = (train_ds,)
+      else:
+        res += (train_ds,)
 
     if self.loader.val and (only is None or only == "val"):
       val_ds = self._preprocess(
-        pre, ds["val"], None, None, ("val",), finalize)
+        pre, lambda: ds["val"], None, None, ("val",), finalize)
       if only == "val":
         return val_ds
       res += (val_ds,)
     if self.loader.test and (only is None or only == "test"):
       test_ds = self._preprocess(
-        pre, ds["test"], None, None, ("test",), finalize)
+        pre, lambda: ds["test"], None, None, ("test",), finalize)
       if only == "test":
         return test_ds
       res += (test_ds,)

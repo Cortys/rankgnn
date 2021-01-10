@@ -28,11 +28,17 @@ class ObjectEncoder(Encoder):
   name = "oid"
 
   def preprocess(self, elements):
+    if isinstance(elements, np.ndarray):
+      return elements
+
     a = np.empty(len(elements), dtype='O')
     a[:] = elements
     return a
 
   def finalize(self, aggregator):
+    if isinstance(aggregator, np.ndarray):
+      return aggregator
+
     a = np.empty(len(aggregator), dtype='O')
     a[:] = aggregator
     return a
@@ -51,3 +57,4 @@ class TupleEncoder(transformer.TupleTransformer, Encoder):
 
 
 transformer.register_transformer(Encoder, TupleEncoder)
+ObjectEncoder.identity = ObjectEncoder()

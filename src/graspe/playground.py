@@ -22,7 +22,7 @@ import graspe.models.gnn as gnn
 def time_str():
   return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
-def experiment(provider, model, **config):
+def experiment(provider, model, log=True, **config):
   enc = fy.first(provider.find_compatible_encoding(
     model.input_encodings, model.output_encodings))
   in_enc, out_enc = enc
@@ -35,6 +35,7 @@ def experiment(provider, model, **config):
     activation="sigmoid", inner_activation="relu",
     # att_conv_activation="relu",
     pooling="softmax")
+  print("Instanciated model.")
   if provider.dataset_size < 10:
     ds_train = provider.get(enc)
     ds_val, ds_test = ds_train, ds_train
@@ -45,10 +46,19 @@ def experiment(provider, model, **config):
       outer_idx=5)
     targets = provider.get_test_split(outer_idx=5)[1]
 
+  print("Loaded encoded datasets.")
   provider.unload_dataset()
   opt = keras.optimizers.Adam(0.0001)
+
+  if out_enc == "float32":
+    loss = "mean_squared_error"
+    metrics = []
+  else:
+    loss = "binary_crossentropy"
+    metrics = ["binary_accuracy"]
+
   m.compile(
-    optimizer=opt, loss="binary_crossentropy", metrics=["binary_accuracy"])
+    optimizer=opt, loss=loss, metrics=metrics)
 
   t = time_str()
   log_dir = f"../logs/{t}_{m.name}_{provider.name}/"
@@ -56,12 +66,12 @@ def experiment(provider, model, **config):
     log_dir=log_dir,
     histogram_freq=50,
     profile_batch="100,115")
-
+  print("Compiled model.")
   m.fit(
     ds_train.cache(),
     validation_data=ds_val.cache(),
     epochs=5000, verbose=2,
-    callbacks=[tb])
+    callbacks=[tb] if log else [])
   m.evaluate(ds_test)
   print(np.around(m.predict(ds_test), 2))
   print(targets)
@@ -71,5 +81,12 @@ def experiment(provider, model, **config):
 provider = tu.ZINC()
 # provider = tu.Mutag()
 model = gnn.GIN
-experiment(provider, model, batch_size_limit=100)
+
+experiment(provider, model, batch_size_limit=10000, log=False)
+
+# splits = provider.get_split(("wl1", "float32"), dict(batch_size_limit=500))
+# fy.first(splits[2])
+# provider.unload_dataset()
 # provider.dataset
+# utils.draw_graph(provider.train_dataset[0][10000])
+# list(provider.get_test_split(("wl1", "float32"), dict(batch_size_limit=10)))[0]

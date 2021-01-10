@@ -103,6 +103,8 @@ class BatchingPreprocessor(Preprocessor):
 
 class DefaultPreprocessor(Preprocessor):
   preprocessed_cacheable = False
+  in_encoder_gen = lambda: encoder.ObjectEncoder.identity
+  out_encoder_gen = in_encoder_gen
 
 
 preprocessors = defaultdict(dict)

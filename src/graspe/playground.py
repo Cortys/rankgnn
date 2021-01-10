@@ -69,6 +69,7 @@ def experiment(provider, model, **config):
 
 # provider = syn.triangle_classification_dataset()
 provider = tu.ZINC()
+# provider = tu.Mutag()
 model = gnn.GIN
 experiment(provider, model, batch_size_limit=100)
 # provider.dataset

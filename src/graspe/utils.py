@@ -277,25 +277,34 @@ def register_cache_format(format, load, dump, type="binary"):
   cache_formats[format] = cache_format(load, dump, type)
   return format
 
-def cache(f, file, format="pickle"):
+def cache_read(file, format="pickle"):
   assert format in cache_formats, f"Unknown format '{format}'."
   cache_format = cache_formats[format]
   type = "binary" if format == "pickle" else cache_format.type
 
-  if file.exists():
-    if type == "custom":
-      return cache_format(file)
-    else:
-      with open(file, "rb" if type == "binary" else "r") as f:
-        return cache_format.load(f)
+  if type == "custom":
+    return cache_format.load(file)
+  else:
+    with open(file, "rb" if type == "binary" else "r") as f:
+      return cache_format.load(f)
 
-  res = f()
+def cache_write(file, data, format="pickle"):
+  assert format in cache_formats, f"Unknown format '{format}'."
+  cache_format = cache_formats[format]
+  type = "binary" if format == "pickle" else cache_format.type
 
   if type == "custom":
-    cache_format.dump(res, file)
+    cache_format.dump(data, file)
   else:
     with open(file, "wb" if type == "binary" else "w") as f:
-      cache_format.dump(res, f)
+      cache_format.dump(data, f)
+
+def cache(f, file, format="pickle"):
+  if file.exists():
+    cache_read(file, format)
+
+  res = f()
+  cache_write(file, res, format)
 
   return res
 
@@ -303,8 +312,11 @@ def cached_method(dir_name, suffix="", format="pickle"):
   def cache_annotator(m):
     @fy.wraps(m)
     def cached_m(self, *args, **kwargs):
+      su = suffix(*args, **kwargs) if callable(suffix) else suffix
+      fm = format(*args, **kwargs) if callable(format) else format
+
       dir = make_dir(self.data_dir / dir_name)
-      cache_file = dir / f"{self.name}{suffix}.{format}"
-      return cache(lambda: m(self, *args, **kwargs), cache_file, format)
+      cache_file = dir / f"{self.name}{su}.{fm}"
+      return cache(lambda: m(self, *args, **kwargs), cache_file, fm)
     return cached_m
   return cache_annotator

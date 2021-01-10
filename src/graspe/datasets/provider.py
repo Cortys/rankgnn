@@ -7,19 +7,22 @@ import graspe.utils as utils
 import graspe.preprocessing.preprocessor as preproc
 import graspe.datasets.loader as loader
 
+ldr = loader
 CACHE_ROOT = Path("../data/")
 
 class DatasetProvider:
   name = None
+  loader: ldr.DatasetLoader = None
   _dataset = None
   _splits = None
 
   def __init__(
-    self, loader: loader.DatasetLoader,
+    self, loader: ldr.DatasetLoader,
     outer_k=10, inner_k=None,
     holdout_size=0.1,
     stratify=True,
-    name_suffix=""):
+    name_suffix="",
+    in_memory_cache=True):
     self.loader = loader
     assert outer_k is None or outer_k > 1
     self.outer_k = outer_k
@@ -29,16 +32,15 @@ class DatasetProvider:
     self.holdout_size = holdout_size
     self.stratify = stratify and loader.stratifiable
     self.name_suffix = name_suffix
+    self.in_memory_cache = in_memory_cache
 
   @property
   def in_meta(self):
-    self._cache_dataset()
-    return self._dataset["in_meta"]
+    return self._cache_dataset(only_meta=True)["in_meta"]
 
   @property
   def out_meta(self):
-    self._cache_dataset()
-    return self._dataset["out_meta"]
+    return self._cache_dataset(only_meta=True)["out_meta"]
 
   @property
   def full_name(self):
@@ -46,21 +48,18 @@ class DatasetProvider:
 
   @property
   def dataset(self):
-    self._cache_dataset(only_meta=False)
-    return self._dataset["elements"]
+    return self._cache_dataset(only_meta=False)["elements"]
 
   @property
   def dataset_size(self):
-    self._cache_dataset()
-    return self._dataset["size"]
+    return self._cache_dataset(only_meta=True)["size"]
 
   @property
   def stratify_labels(self):
     if not self.stratify:
       return None
 
-    self._cache_dataset()
-    return self._dataset["stratify_labels"]
+    return self._cache_dataset(only_meta=False)["stratify_labels"]
 
   @property
   def dataset_type(self):
@@ -73,12 +72,15 @@ class DatasetProvider:
 
     return self._splits
 
-  def _load_dataset(self, only_meta=True):
+  def _load_dataset(self, only_meta=False, id=None):
     return self.loader.load_dataset(only_meta)
 
-  def _cache_dataset(self, only_meta=True):
+  def _cache_dataset(self, only_meta=False, id=None):
+    if not self.in_memory_cache:
+      return self._load_dataset(only_meta, id)
+
     if self._dataset is None or not (only_meta or "elements" in self._dataset):
-      self._dataset = self._load_dataset(only_meta)
+      self._dataset = self._load_dataset(only_meta, id)
 
     return self._dataset
 
@@ -147,7 +149,7 @@ class DatasetProvider:
 
   def _preprocess(
     self, pre: preproc.Preprocessor, ds_get, indices, train_indices,
-    index_id, finalize=True):
+    index_id=None, finalize=True, ds_id=None):
     return pre.transform(ds_get(), indices, train_indices, finalize)
 
   def get(
@@ -234,8 +236,7 @@ class DatasetProvider:
     return self.get_split(enc, config, outer_idx, inner_idx, "test", finalize)
 
   def stats(self):
-    self._cache_dataset(only_meta=False)
-    return self.loader.stats(self._dataset)
+    return self.loader.stats(self._cache_dataset(only_meta=False))
 
   def find_compatible_encoding(self, input_encodings, output_encodings):
     compatible_encodings = preproc.find_encodings(self.dataset_type)
@@ -257,9 +258,31 @@ class CachingDatasetProvider(DatasetProvider):
     self.finalize_cache = finalize_cache
     self.data_dir = utils.make_dir(self.root_dir / self.full_name)
 
-  @utils.cached_method("processed")
-  def _load_dataset(self, only_meta=True):
-    return super()._load_dataset(only_meta=False)  # always load the elements
+  def _load_dataset(self, only_meta=False, id=None):
+    dir = utils.make_dir(self.data_dir / "processed")
+    suffix = f"_{id}" if id is not None else ""
+    meta_cache_file = dir / f"{self.name}{suffix}_meta.json"
+    data_cache_file = dir / f"{self.name}{suffix}.pickle"
+    checked_file = meta_cache_file if only_meta else data_cache_file
+    checked_format = "json" if only_meta else "pickle"
+
+    if checked_file.exists():
+      return utils.cache_read(checked_file, checked_format)
+
+    ds = super()._load_dataset(only_meta, id)
+
+    if "elements" in ds:
+      utils.cache_write(data_cache_file, ds, "pickle")
+      if not meta_cache_file.exists():
+        ds_meta = ds.copy()
+        del ds_meta["elements"]
+        if "stratify_labels" in ds:
+          del ds_meta["stratify_labels"]
+        utils.cache_write(meta_cache_file, ds_meta, "json")
+    elif not meta_cache_file.exists():
+      utils.cache_write(meta_cache_file, ds, "json")
+
+    return ds
 
   @utils.cached_method("processed", suffix="_splits", format="json")
   def _make_splits(self):
@@ -267,8 +290,9 @@ class CachingDatasetProvider(DatasetProvider):
 
   def _preprocess(
     self, pre: preproc.Preprocessor, ds_get, indices, train_indices,
-    index_id, finalize=True):
-    suffix = "" if index_id is None else "_" + "_".join(
+    index_id=None, finalize=True, ds_id=None):
+    ds_suffix = "" if ds_id is None else "_" + "_".join(fy.map(str, ds_id))
+    idx_suffix = "" if index_id is None else "_" + "_".join(
       fy.map(str, index_id))
     preprocessed_cache = pre.preprocessed_cacheable and self.preprocessed_cache
     preprocessed_dir = self.data_dir / pre.preprocessed_name
@@ -277,19 +301,19 @@ class CachingDatasetProvider(DatasetProvider):
     preprocessed_format = pre.preprocessed_format or "pickle"
 
     def preproc():
-      ds = ds_get()
+      f = ds_get
       if indices is not None and not pre.slice_after_preprocess:
-        ds = pre.slice(ds, indices, train_indices)
+        f = lambda: pre.slice(ds_get(), indices, train_indices)
         preprocess_file = preprocessed_dir / \
-            f"{self.name}{suffix}.{preprocessed_format}"
+            f"{self.name}{ds_suffix}{idx_suffix}.{preprocessed_format}"
       else:
         preprocess_file = preprocessed_dir / \
-            f"{self.name}.{preprocessed_format}"
+            f"{self.name}{ds_suffix}.{preprocessed_format}"
 
       if preprocessed_cache:
-        ds = utils.cache(lambda: pre.preprocess(ds), preprocess_file)
+        ds = utils.cache(lambda: pre.preprocess(f()), preprocess_file)
       else:
-        ds = pre.preprocess(ds)
+        ds = pre.preprocess(f())
 
       if indices is not None and pre.slice_after_preprocess:
         ds = pre.slice(ds, indices, train_indices)
@@ -301,28 +325,87 @@ class CachingDatasetProvider(DatasetProvider):
         preprocessed_dir / f"final-{pre.finalized_name}")
       finalized_format = pre.finalized_format or "pickle"
       finalized_file = finalized_dir / \
-          f"{self.name}{suffix}.{finalized_format}"
+          f"{self.name}{ds_suffix}{idx_suffix}.{finalized_format}"
       return utils.cache(
         preproc, finalized_file, finalized_format)
     else:
       return preproc()
 
 class PresplitDatasetProvider(DatasetProvider):
+  loader: ldr.PresplitDatasetLoader = None
+  _train_dataset = None
+  _val_dataset = None
+  _test_dataset = None
+
   def __init__(
     self, loader_train, loader_val=None, loader_test=None, **kwargs):
     super().__init__(
       loader.PresplitDatasetLoader(loader_train, loader_val, loader_test),
       outer_k=None, inner_k=None, **kwargs)
 
+  def _load_dataset(self, only_meta=False, id=None):
+    if id == "train":
+      return self.loader.load_train_dataset(only_meta)
+    elif id == "val":
+      return self.loader.load_validation_dataset(only_meta)
+    elif id == "test":
+      return self.loader.load_test_dataset(only_meta)
+    raise AssertionError(f"Unknown dataset id {id}.")
+
+  def _cache_dataset(self, only_meta=False, id=None):
+    if not self.in_memory_cache:
+      if id is None:
+        return dict(
+          train=self._load_dataset(only_meta, "train"),
+          val=self._load_dataset(
+            only_meta, "val") if self.loader.val else None,
+          test=self._load_dataset(
+            only_meta, "test") if self.loader.test else None)
+      else:
+        return self._load_dataset(only_meta, id)
+
+    if id == "train":
+      if self._train_dataset is None or not (
+        only_meta or "elements" in self._train_dataset):
+        self._train_dataset = self._load_dataset(only_meta, "train")
+      return self._train_dataset
+    elif id == "val":
+      if self._val_dataset is None or not (
+        only_meta or "elements" in self._val_dataset):
+        self._val_dataset = self._load_dataset(only_meta, "val")
+      return self._val_dataset
+    elif id == "test":
+      if self._test_dataset is None or not (
+        only_meta or "elements" in self._test_dataset):
+        self._test_dataset = self._load_dataset(only_meta, "test")
+      return self._test_dataset
+    else:
+      self._cache_dataset(only_meta, "train")
+      if self.loader.val:
+        self._cache_dataset(only_meta, "val")
+      if self.loader.test:
+        self._cache_dataset(only_meta, "test")
+      return self._dataset
+
+  def unload_dataset(self):
+    self._train_dataset = None
+    self._val_dataset = None
+    self._test_dataset = None
+
+  @property
+  def _dataset(self):
+    return dict(
+      train=self._train_dataset,
+      val=self._val_dataset,
+      test=self._test_dataset)
+
   @property
   def in_meta(self):
-    self._cache_dataset()
-    return self._dataset["train"]["in_meta"]
+    return self._cache_dataset(only_meta=True, id="train")["in_meta"]
 
   @property
   def out_meta(self):
-    self._cache_dataset()
-    return self._dataset["train"]["out_meta"]
+    return self._cache_dataset(only_meta=True, id="train")["out_meta"]
 
   @property
   def full_name(self):
@@ -330,22 +413,32 @@ class PresplitDatasetProvider(DatasetProvider):
 
   @property
   def dataset(self):
-    self._cache_dataset(only_meta=False)
-    ds = self._dataset
+    ds = self._cache_dataset(only_meta=False)
     return dict(
       train=ds["train"]["elements"],
-      val=ds["val"]["elements"] if "val" in ds else None,
-      test=ds["test"]["elements"] if "test" in ds else None
+      val=ds["val"]["elements"] if ds["val"] else None,
+      test=ds["test"]["elements"] if ds["test"] else None
     )
 
   @property
+  def train_dataset(self):
+    return self._cache_dataset(only_meta=False, id="train")["elements"]
+
+  @property
+  def validation_dataset(self):
+    return self._cache_dataset(only_meta=False, id="val")["elements"]
+
+  @property
+  def test_dataset(self):
+    return self._cache_dataset(only_meta=False, id="test")["elements"]
+
+  @property
   def dataset_split_sizes(self):
-    self._cache_dataset()
-    ds = self._dataset
+    ds = self._cache_dataset(only_meta=True)
     return dict(
       train=ds["train"]["size"],
-      val=ds["val"]["size"] if "val" in ds else None,
-      test=ds["test"]["size"] if "test" in ds else None
+      val=ds["val"]["size"] if ds["val"] else None,
+      test=ds["test"]["size"] if ds["test"] else None
     )
 
   @property
@@ -365,12 +458,12 @@ class PresplitDatasetProvider(DatasetProvider):
   def get_split(
     self, enc=None, config=None, outer_idx=None, inner_idx=None,
     only=None, finalize=True):
-    ds = self.dataset
     pre = self._get_preprocessor(enc, config)
     res = ()
     if only is None or only == "train":
       train_ds = self._preprocess(
-        pre, lambda: ds["train"], None, None, ("train",), finalize)
+        pre, lambda: self.train_dataset,
+        None, None, None, finalize, ("train",))
       if only == "train":
         return train_ds
       else:
@@ -378,13 +471,15 @@ class PresplitDatasetProvider(DatasetProvider):
 
     if self.loader.val and (only is None or only == "val"):
       val_ds = self._preprocess(
-        pre, lambda: ds["val"], None, None, ("val",), finalize)
+        pre, lambda: self.validation_dataset,
+        None, None, None, finalize, ("val",))
       if only == "val":
         return val_ds
       res += (val_ds,)
     if self.loader.test and (only is None or only == "test"):
       test_ds = self._preprocess(
-        pre, lambda: ds["test"], None, None, ("test",), finalize)
+        pre, lambda: self.test_dataset,
+        None, None, None, finalize, ("test",))
       if only == "test":
         return test_ds
       res += (test_ds,)

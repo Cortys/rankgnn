@@ -27,6 +27,17 @@ class PresplitDatasetLoader(DatasetLoader):
     if test:
       assert self.dataset_type == test.dataset_type
 
+  def load_train_dataset(self, only_meta=True):
+    return self.train.load_dataset(only_meta)
+
+  def load_validation_dataset(self, only_meta=True):
+    assert self.val is not None
+    return self.val.load_dataset(only_meta)
+
+  def load_test_dataset(self, only_meta=True):
+    assert self.test is not None
+    return self.test.load_dataset(only_meta)
+
   def load_dataset(self, only_meta=True):
     res = dict(train=self.train.load_dataset(only_meta))
     if self.val:

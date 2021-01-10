@@ -76,7 +76,7 @@ class TUDatasetProvider(provider.CachingDatasetProvider):
     super().__init__(loader, *args, **kwargs)
 
 class PresplitTUDatasetProvider(
-  provider.PresplitDatasetProvider, provider.CachingDatasetProvider):
+  provider.CachingDatasetProvider, provider.PresplitDatasetProvider):
   root_dir = provider.CACHE_ROOT / "tu"
 
   def __init__(self, name, name_train, name_val, name_test, config, **kwargs):

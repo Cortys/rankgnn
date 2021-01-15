@@ -252,13 +252,19 @@ class CachingDatasetProvider(DatasetProvider):
   root_dir = CACHE_ROOT
 
   def __init__(
-    self, *args, preprocessed_cache=True, finalize_cache=False, **kwargs):
+    self, *args, load_cache=True, preprocessed_cache=True,
+    finalize_cache=False,
+    cache=True, **kwargs):
     super().__init__(*args, **kwargs)
-    self.preprocessed_cache = preprocessed_cache
-    self.finalize_cache = finalize_cache
+    self.load_cache = cache and load_cache
+    self.finalize_cache = cache and finalize_cache
+    self.finalize_cache = cache and finalize_cache
     self.data_dir = utils.make_dir(self.root_dir / self.full_name)
 
   def _load_dataset(self, only_meta=False, id=None):
+    if not self.load_cache:
+      return super()._load_dataset(only_meta, id)
+
     dir = utils.make_dir(self.data_dir / "processed")
     suffix = f"_{id}" if id is not None else ""
     meta_cache_file = dir / f"{self.name}{suffix}_meta.json"

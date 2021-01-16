@@ -147,7 +147,8 @@ def vec_to_unit(feat):
   return u
 
 def draw_graph(
-  g, y=None, with_features=False, with_colors=True, label_colors=True):
+  g, y=None, with_features=False, with_colors=True,
+  label_colors=True, layout="spring"):
   plt.figure()
 
   if y is not None:
@@ -158,16 +159,24 @@ def draw_graph(
     vec_to_unit([d.get("label", 0)] if label_colors else d.get("features", []))
     for n, d in g.nodes(data=True)] if with_colors else "#1f78b4"
 
+  f = dict(
+    spring=nx.draw_spring,
+    planar=nx.draw_planar,
+    spectral=nx.draw_spectral,
+    circular=nx.draw_circular,
+    random=nx.draw_random,
+    kawai=nx.draw_kamada_kawai)[layout]
+
   if with_features:
     labels = {
       n: f"{n}:" + str(data.get("features"))
       for n, data in g.nodes(data=True)
     }
-    nx.draw_spring(
+    f(
       g, labels=labels,
       node_color=node_color, vmin=0, vmax=1, cmap=cmap)
   else:
-    nx.draw_spring(
+    f(
       g, with_labels=True,
       node_color=node_color, vmin=0, vmax=1, cmap=cmap)
 

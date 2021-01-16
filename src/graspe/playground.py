@@ -85,6 +85,8 @@ model = gnn.GIN
 experiment(provider, model, batch_size_limit=10000, log=False)
 
 # splits = provider.get_split(("wl1", "float32"), dict(batch_size_limit=500))
+# provider.get_test_split(outer_idx=5)[1]
+# fy.last(splits[2])
 # fy.first(splits[2])
 # provider.unload_dataset()
 # provider.dataset

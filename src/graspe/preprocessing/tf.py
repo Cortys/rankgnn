@@ -8,7 +8,6 @@ import graspe.preprocessing.graph.wl1 as wl1_enc
 import graspe.preprocessing.graph.wl2 as wl2_enc
 import graspe.preprocessing.classification as cls_enc
 
-@fully_tolerant
 def wl1(meta):
   feature_dim = wl1_enc.feature_dim(**meta)
 
@@ -20,7 +19,6 @@ def wl1(meta):
     "n": tf.TensorSpec(shape=[None], dtype=tf.int32),
   }
 
-@fully_tolerant
 def wl2(meta):
   feature_dim = wl2_enc.feature_dim(**meta)
 
@@ -33,29 +31,36 @@ def wl2(meta):
     "n": tf.TensorSpec(shape=[None], dtype=tf.int32),
   }
 
-@fully_tolerant
 def float32(meta):
   shape = [None, meta["feature_dim"]] if "feature_dim" in meta else [None]
 
   return tf.TensorSpec(shape=shape, dtype=tf.float32)
 
-@fully_tolerant
 def multiclass(meta):
   return float32(dict(feature_dim=meta.get("classes", 2)))
 
 def pair(enc):
-  @fully_tolerant
   def pair_enc(meta):
     signature = enc(meta)
     return signature, signature
   return pair_enc
 
+def pref(enc):
+  def pref_enc(meta):
+    signature = enc(meta)
+    return (
+      signature,
+      tf.TensorSpec(shape=[None], dtype=tf.int32),
+      tf.TensorSpec(shape=[None], dtype=tf.int32))
+  return pref_enc
 
 encodings = dict(
   wl1=wl1,
   wl1_pair=pair(wl1),
+  wl1_pref=pref(wl1),
   wl2=wl2,
   wl2_pair=pair(wl2),
+  wl2_pref=pref(wl2),
   float32=float32,
   binary=float32,
   multiclass=multiclass
@@ -117,27 +122,32 @@ class TFPreprocessor(preprocessor.BatchingPreprocessor):
 def create_preprocessor(
   type, enc,
   in_encoder=None, in_batcher=None,
-  out_encoder=None, out_batcher=None):
+  out_encoder=None, out_batcher=None,
+  io_encoder=False, io_batcher=False):
   e = enc
 
   class Preprocessor(TFPreprocessor):
     enc = e
     if in_encoder is not None:
       in_encoder_gen = in_encoder
-    if out_encoder is not None:
+    if out_encoder is not None or io_encoder:
       out_encoder_gen = out_encoder
     if in_batcher is not None:
       in_batcher_gen = in_batcher
-    if out_batcher is not None:
+    if out_batcher is not None or io_batcher:
       out_batcher_gen = out_batcher
 
   preprocessor.register_preprocessor(type, enc, Preprocessor)
   return Preprocessor
 
-def create_graph_preprocessors(name, encoder, batcher):
+def create_graph_preprocessors(name, encoder, batcher, pref_util_batcher):
+  create_preprocessor(
+    ("graph", "number"), (name, "float32"),
+    encoder, batcher)
   create_preprocessor(
     ("graph", "vector"), (name, "float32"),
     encoder, batcher)
+
   create_preprocessor(
     ("graph", "binary"), (name, "binary"),
     encoder, batcher)
@@ -150,6 +160,15 @@ def create_graph_preprocessors(name, encoder, batcher):
     encoder, batcher,
     cls_enc.MulticlassEncoder)
 
+  create_preprocessor(
+    ("graph", "number"), (f"{name}_pref", "binary"),
+    encoder, pref_util_batcher,
+    io_batcher=True)  # pref_util_batcher processes (graphs, utils) tuples
 
-create_graph_preprocessors("wl1", wl1_enc.WL1Encoder, wl1_enc.WL1Batcher)
-create_graph_preprocessors("wl2", wl2_enc.WL2Encoder, wl2_enc.WL2Batcher)
+
+create_graph_preprocessors(
+  "wl1", wl1_enc.WL1Encoder, wl1_enc.WL1Batcher,
+  wl1_enc.WL1UtilityPreferenceBatcher)
+create_graph_preprocessors(
+  "wl2", wl2_enc.WL2Encoder, wl2_enc.WL2Batcher,
+  wl2_enc.WL2UtilityPreferenceBatcher)

@@ -257,7 +257,7 @@ class CachingDatasetProvider(DatasetProvider):
     cache=True, **kwargs):
     super().__init__(*args, **kwargs)
     self.load_cache = cache and load_cache
-    self.finalize_cache = cache and finalize_cache
+    self.preprocessed_cache = cache and preprocessed_cache
     self.finalize_cache = cache and finalize_cache
     self.data_dir = utils.make_dir(self.root_dir / self.full_name)
 

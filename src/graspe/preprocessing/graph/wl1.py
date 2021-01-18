@@ -4,6 +4,7 @@ from graspe.utils import tolerant
 import graspe.preprocessing.utils as enc_utils
 import graspe.preprocessing.batcher as batcher
 import graspe.preprocessing.encoder as encoder
+import graspe.preprocessing.preference.utility as pref_util
 
 @tolerant
 def feature_dim(node_feature_dim=0, node_label_count=0):
@@ -89,6 +90,15 @@ class WL1Encoder(encoder.ObjectEncoder):
       node_label_count=self.node_label_count,
       node_ordering=node_ordering)
 
+def make_wl1_batch(graphs, masking=False):
+  return enc_utils.make_graph_batch(
+    graphs,
+    ref_keys=["ref_a", "ref_b"],
+    masking_fns=dict(
+      ref_a_idx=lambda e: e["ref_a"],
+      ref_b_idx=lambda e: e["ref_b"]) if masking else None,
+    meta_fns=dict(n=vertex_count))
+
 class WL1Batcher(batcher.Batcher):
   name = "wl1"
 
@@ -108,13 +118,32 @@ class WL1Batcher(batcher.Batcher):
     self.basename += suffix
 
   def finalize(self, graphs):
-    return enc_utils.make_graph_batch(
-      graphs,
-      ref_keys=["ref_a", "ref_b"],
-      masking_fns=dict(
-        ref_a_idx=lambda e: e["ref_a"],
-        ref_b_idx=lambda e: e["ref_b"]) if self.masking else None,
-      meta_fns=dict(n=vertex_count))
+    return make_wl1_batch(graphs, self.masking)
 
-  def compute_space(self, graph):
+  def compute_space(self, graph, batch):
+    return space_metrics[self.space_metric](graph)
+
+class WL1UtilityPreferenceBatcher(pref_util.UtilityPreferenceBatcher):
+  name = "wl1_util_pref"
+
+  def __init__(
+    self, in_meta, out_meta, **kwargs):
+    super().__init__(in_meta, out_meta, **kwargs)
+    self.space_metric = in_meta.get("space_metric", "embeddings_count")
+    assert self.space_metric in space_metrics, "Unknown WL1 space metric."
+    self.masking = in_meta.get("masking", False)
+
+    suffix = ""
+    if self.batch_space_limit is not None:
+      suffix += f"_{self.space_metric}_metric"
+    if self.masking:
+      suffix += "_masked"
+
+    self.name += suffix
+    self.basename += suffix
+
+  def finalize_objects(self, graphs):
+    return make_wl1_batch(graphs, self.masking)
+
+  def compute_object_space(self, graph):
     return space_metrics[self.space_metric](graph)

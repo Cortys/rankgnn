@@ -1,13 +1,10 @@
 import funcy as fy
 from collections import defaultdict
 
-from graspe.utils import tolerant, select_prefixed_keys
+from graspe.utils import tolerant, tolerant_method, select_prefixed_keys
 import graspe.preprocessing.transformer as transformer
 import graspe.preprocessing.encoder as encoder
 import graspe.preprocessing.batcher as batcher
-
-def tolerant_method(f):
-  return tolerant(getattr(f, "__func__", f))
 
 class Preprocessor:
   # Most efficient preprocessing allowed by default:
@@ -27,23 +24,28 @@ class Preprocessor:
     if config is None:
       config = {}
 
+    self.config = config
     self.in_config = select_prefixed_keys(config, "in_", True)
     self.out_config = select_prefixed_keys(config, "out_", True)
     self.in_meta = in_meta
     self.out_meta = out_meta
     self.in_args = fy.merge(self.in_config, in_meta)
 
-    in_enc = tolerant_method(self.in_encoder_gen)(**self.in_args)
+    in_enc_cls = tolerant_method(self.in_encoder_gen)
 
     if out_meta is None:
-      self.encoder = in_enc
+      self.encoder = in_enc_cls(**self.in_args)
       self.out_args = None
       self.has_out = False
     else:
       self.out_args = fy.merge(self.out_config, out_meta)
-      out_enc = tolerant_method(self.out_encoder_gen)(**self.out_args)
-      self.encoder = transformer.tuple(in_enc, out_enc)
-      self.has_out = True
+      if self.out_encoder_gen is None:
+        self.encoder = in_enc_cls(self.in_args, self.out_args, **config)
+      else:
+        in_enc = in_enc_cls(**self.in_args)
+        out_enc = tolerant_method(self.out_encoder_gen)(**self.out_args)
+        self.encoder = transformer.tuple(in_enc, out_enc)
+        self.has_out = True
 
   @property
   def preprocessed_name(self):
@@ -86,13 +88,17 @@ class BatchingPreprocessor(Preprocessor):
   def __init__(self, in_meta=None, out_meta=None, config=None):
     super().__init__(in_meta, out_meta, config)
 
-    in_bat = tolerant_method(self.in_batcher_gen)(**self.in_args)
+    in_bat_cls = tolerant_method(self.in_batcher_gen)
 
     if out_meta is None:
-      self.batcher = in_bat
+      self.batcher = in_bat_cls(**self.in_args)
     else:
-      out_bat = tolerant_method(self.out_batcher_gen)(**self.out_args)
-      self.batcher = transformer.tuple(in_bat, out_bat)
+      if self.out_batcher_gen is None:
+        self.batcher = in_bat_cls(self.in_args, self.out_args, **self.config)
+      else:
+        in_bat = in_bat_cls(**self.in_args)
+        out_bat = tolerant_method(self.out_batcher_gen)(**self.out_args)
+        self.batcher = transformer.tuple(in_bat, out_bat)
 
   @property
   def finalized_name(self):

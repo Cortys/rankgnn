@@ -78,11 +78,12 @@ def experiment(provider, model, log=True, **config):
 
 
 # provider = syn.triangle_classification_dataset()
-provider = tu.ZINC()
+provider = syn.triangle_count_dataset()
+# provider = tu.ZINC()
 # provider = tu.Mutag()
 model = gnn.GIN
 
-experiment(provider, model, batch_size_limit=10000, log=False)
+# experiment(provider, model, batch_size_limit=10000, log=False)
 
 # splits = provider.get_split(("wl1", "float32"), dict(batch_size_limit=500))
 # provider.get_test_split(outer_idx=5)[1]
@@ -92,3 +93,5 @@ experiment(provider, model, batch_size_limit=10000, log=False)
 # provider.dataset
 # utils.draw_graph(provider.train_dataset[0][10000])
 # list(provider.get_test_split(("wl1", "float32"), dict(batch_size_limit=10)))[0]
+# provider.dataset
+list(provider.get(("wl1_pref", "binary"), config=dict(batch_size_limit=3)))[0]

@@ -15,4 +15,4 @@ IMDBMulti = tu_dataset("IMDB-MULTI", type="multiclass", classes=3)
 # Regression:
 ZINC = presplit_tu_dataset(
   "ZINC", "ZINC_train", "ZINC_val", "ZINC_test",
-  type="vector")
+  type="number")

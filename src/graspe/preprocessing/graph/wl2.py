@@ -5,6 +5,7 @@ from graspe.utils import tolerant
 import graspe.preprocessing.utils as enc_utils
 import graspe.preprocessing.batcher as batcher
 import graspe.preprocessing.encoder as encoder
+import graspe.preprocessing.preference.utility as pref_util
 
 @tolerant
 def feature_dim(
@@ -126,6 +127,12 @@ class WL2Encoder(encoder.ObjectEncoder):
       self.node_feature_dim, self.node_label_count,
       self.edge_feature_dim, self.edge_label_count)
 
+def make_wl2_batch(graphs):
+  return enc_utils.make_graph_batch(
+    graphs,
+    ref_keys=["ref_a", "ref_b", "backref"],
+    meta_fns=dict(n=vertex_count))
+
 class WL2Batcher(batcher.Batcher):
   name = "wl2"
 
@@ -139,10 +146,26 @@ class WL2Batcher(batcher.Batcher):
       self.basename += suffix
 
   def finalize(self, graphs):
-    return enc_utils.make_graph_batch(
-      graphs,
-      ref_keys=["ref_a", "ref_b", "backref"],
-      meta_fns=dict(n=vertex_count))
+    return make_wl2_batch(graphs)
 
-  def compute_space(self, graph):
+  def compute_space(self, graph, batch):
+    return space_metrics[self.space_metric](graph)
+
+class WL2UtilityPreferenceBatcher(pref_util.UtilityPreferenceBatcher):
+  name = "wl2_util_pref"
+
+  def __init__(self, in_meta, out_meta, **kwargs):
+    super().__init__(in_meta, out_meta, **kwargs)
+    self.space_metric = in_meta.get("space_metric", "embeddings_count")
+    assert self.space_metric in space_metrics, "Unknown WL2 space metric."
+
+    if self.batch_space_limit is not None:
+      suffix = f"_{self.space_metric}_metric"
+      self.name += suffix
+      self.basename += suffix
+
+  def finalize_objects(self, graphs):
+    return make_wl2_batch(graphs)
+
+  def compute_object_space(self, graph):
     return space_metrics[self.space_metric](graph)

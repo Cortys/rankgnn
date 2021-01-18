@@ -141,7 +141,7 @@ def triangle_count_graph(height, arity, triangles, cycles):
 
   return g, triangles
 
-@synthetic_graph_embed_dataset(type="vector")
+@synthetic_graph_embed_dataset(type="number")
 def triangle_count_dataset(seed=1337):
   with local_seed(seed):
     heights = range(2, 8)

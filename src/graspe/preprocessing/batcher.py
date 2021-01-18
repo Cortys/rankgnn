@@ -19,7 +19,7 @@ class Batcher(transformer.Transformer):
 
     self.name = name
 
-  def compute_space(self, element):
+  def compute_space(self, element, batch):
     return 0
 
   def batch_generator(self, elements):
@@ -30,10 +30,11 @@ class Batcher(transformer.Transformer):
     if batch_size_limit == 1:
       def batch_generator():
         for e in self.iterate(elements):
-          if batch_space_limit is not None:
-            assert self.compute_space(e) <= batch_space_limit
-
           batch = self.create_aggregator(elements)
+
+          if batch_space_limit is not None:
+            assert self.compute_space(e, batch) <= batch_space_limit
+
           self.append(batch, e)
           yield self.finalize(batch)
     else:
@@ -45,7 +46,7 @@ class Batcher(transformer.Transformer):
 
         for e in self.iterate(elements):
           if batch_space_limit is not None:
-            e_space = self.compute_space(e)
+            e_space = self.compute_space(e, batch)
             assert e_space <= batch_space_limit
             batch_space += e_space
 
@@ -72,13 +73,14 @@ class Batcher(transformer.Transformer):
 
   def transform(self, elements):
     gen = self.batch_generator(elements)
-    return gen() if self.lazy_batching else list(self.gen())
+    return gen() if self.lazy_batching else list(gen())
 
 class TupleBatcher(transformer.TupleTransformer, Batcher):
   def __init__(self, *batchers, size=2, **kwargs):
     batch_space_limit = 0
     batch_size_limit = None
     space_limiting_batchers = []
+    lazy_batching = True
 
     for i, bat in enumerate(batchers):
       assert isinstance(bat, Batcher)
@@ -90,6 +92,8 @@ class TupleBatcher(transformer.TupleTransformer, Batcher):
       if bat.batch_space_limit is not None:
         batch_space_limit += bat.batch_space_limit
         space_limiting_batchers.append(i)
+      if not bat.lazy_batching:
+        lazy_batching = False
 
     super().__init__(*batchers, size=size)
     self.batch_size_limit = kwargs.get(
@@ -97,6 +101,8 @@ class TupleBatcher(transformer.TupleTransformer, Batcher):
     self.batch_space_limit = kwargs.get(
       "batch_space_limit", batch_space_limit)
     self.space_limiting_batchers = space_limiting_batchers
+    self.lazy_batching = kwargs.get(
+      "lazy_batching", lazy_batching)
     base = "-".join(b.basename for b in batchers)
     name = base
     sep = "-"
@@ -109,10 +115,10 @@ class TupleBatcher(transformer.TupleTransformer, Batcher):
 
     self.name = name
 
-  def compute_space(self, element):
+  def compute_space(self, element, batch):
     batchers = self.transformers
     return sum(
-      batchers[i].compute_space(element[i])
+      batchers[i].compute_space(element[i], batch[i])
       for i in self.space_limiting_batchers)
 
 

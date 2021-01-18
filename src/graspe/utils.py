@@ -41,6 +41,9 @@ def tolerant(f=None, only_named=True, ignore_varkwargs=False):
 
   return wrapper
 
+def tolerant_method(f):
+  return tolerant(getattr(f, "__func__", f))
+
 
 fully_tolerant = tolerant(only_named=False)
 

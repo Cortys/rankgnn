@@ -52,11 +52,15 @@ class PreferenceAggregator:
     return space
 
   def finalize(self, object_finalize_fn):
+    obj = object_finalize_fn(self.objects)
     pref_a = self.pref_a
     pref_b = self.pref_b
 
-    return (
-      object_finalize_fn(self.objects), pref_a, pref_b), np.ones(len(pref_a))
+    return {
+      **obj,
+      "pref_a": pref_a,
+      "pref_b": pref_b
+    }, np.ones(len(pref_a))
 
 class UtilityPreferenceBatcher(batcher.Batcher, metaclass=ABCMeta):
   name = "util_pref"

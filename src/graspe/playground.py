@@ -26,12 +26,14 @@ def experiment(provider, model, log=True, **config):
   enc = fy.first(provider.find_compatible_encoding(
     model.input_encodings, model.output_encodings))
   in_enc, out_enc = enc
+  dim = 64
+  edim = 64
   m = model(
     in_enc=in_enc, out_enc=out_enc,
     in_meta=provider.in_meta, out_meta=provider.out_meta,
-    conv_layer_units=[32, 32, 32],
-    att_conv_layer_units=[32, 32, 1],
-    fc_layer_units=[32, 32, 1],
+    conv_layer_units=[dim, dim, dim],
+    att_conv_layer_units=[dim, dim, 1],
+    fc_layer_units=[dim, dim, edim],
     activation="sigmoid", inner_activation="relu",
     # att_conv_activation="relu",
     pooling="softmax")
@@ -81,9 +83,10 @@ def experiment(provider, model, log=True, **config):
 provider = syn.triangle_count_dataset()
 # provider = tu.ZINC()
 # provider = tu.Mutag()
-model = gnn.GIN
+model = gnn.RankWL2GNN
+# model = gnn.RankGIN
 
-# experiment(provider, model, batch_size_limit=10000, log=False)
+experiment(provider, model, batch_size_limit=10000, log=False)
 
 # splits = provider.get_split(("wl1", "float32"), dict(batch_size_limit=500))
 # provider.get_test_split(outer_idx=5)[1]
@@ -94,4 +97,4 @@ model = gnn.GIN
 # utils.draw_graph(provider.train_dataset[0][10000])
 # list(provider.get_test_split(("wl1", "float32"), dict(batch_size_limit=10)))[0]
 # provider.dataset
-list(provider.get(("wl1_pref", "binary"), config=dict(batch_size_limit=3)))[0]
+# fy.first(provider.get(("wl1_pref", "binary"), config=dict(batch_size_limit=3)))

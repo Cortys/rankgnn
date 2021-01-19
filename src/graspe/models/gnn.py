@@ -8,6 +8,7 @@ import graspe.preprocessing.tf as tf_enc
 import graspe.layers.wl1 as wl1
 import graspe.layers.wl2 as wl2
 import graspe.layers.pooling as pl
+import graspe.layers.pref as pref
 
 import warnings
 warnings.filterwarnings(
@@ -15,7 +16,7 @@ warnings.filterwarnings(
   "Converting sparse IndexedSlices*",
   UserWarning)
 
-global_target_encs = ["float32", "binary", "multiclass"]
+global_target_encs = ["float32", "vec32", "binary", "multiclass"]
 
 @cm.model_inputs
 def inputs(in_enc, in_meta):
@@ -52,10 +53,16 @@ def pooled_layers(_, conv_layer, pooling=None):
 
 @cm.model_step
 def finalize(input, out_enc, out_meta=None, squeeze_output=False):
-  if squeeze_output or out_enc == "binary":
+  if squeeze_output or out_enc == "binary" or out_enc == "float32":
     return tf.squeeze(input, -1)
   else:
     return input
+
+def index_selector(idx):
+  @cm.model_step
+  def selector(input):
+    return input[idx]
+  return selector
 
 
 Dense = utils.tolerant(keras.layers.Dense, ignore_varkwargs=True)
@@ -75,3 +82,27 @@ WL2GNN = ck.create_model("WL2GNN", [
   finalize],
   input_encodings=["wl2"],
   output_encodings=global_target_encs)
+
+RankGIN = ck.create_model("RankGIN", [
+  inputs,
+  ([pooled_layers(wl1.GINLayer),
+    cm.with_layers(Dense, prefix="fc")],
+   index_selector("pref_a"), index_selector("pref_b")),
+  cm.merge_ios,
+  cm.with_layer(pref.PrefLookupLayer),
+  cm.with_layer(Dense, units=1, activation="tanh", use_bias=False),
+  cm.with_layer(pref.PrefToBinaryLayer)],
+  input_encodings=["wl1_pref"],
+  output_encodings=["binary"])
+
+RankWL2GNN = ck.create_model("RankWL2GNN", [
+  inputs,
+  ([pooled_layers(wl2.WL2Layer),
+    cm.with_layers(Dense, prefix="fc")],
+   index_selector("pref_a"), index_selector("pref_b")),
+  cm.merge_ios,
+  cm.with_layer(pref.PrefLookupLayer),
+  cm.with_layer(Dense, units=1, activation="tanh", use_bias=False),
+  cm.with_layer(pref.PrefToBinaryLayer)],
+  input_encodings=["wl2_pref"],
+  output_encodings=["binary"])

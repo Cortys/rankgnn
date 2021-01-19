@@ -31,38 +31,33 @@ def wl2(meta):
     "n": tf.TensorSpec(shape=[None], dtype=tf.int32),
   }
 
-def float32(meta):
+def vec32(meta):
   shape = [None, meta["feature_dim"]] if "feature_dim" in meta else [None]
 
   return tf.TensorSpec(shape=shape, dtype=tf.float32)
 
 def multiclass(meta):
-  return float32(dict(feature_dim=meta.get("classes", 2)))
-
-def pair(enc):
-  def pair_enc(meta):
-    signature = enc(meta)
-    return signature, signature
-  return pair_enc
+  return vec32(dict(feature_dim=meta.get("classes", 2)))
 
 def pref(enc):
   def pref_enc(meta):
     signature = enc(meta)
-    return (
-      signature,
-      tf.TensorSpec(shape=[None], dtype=tf.int32),
-      tf.TensorSpec(shape=[None], dtype=tf.int32))
+    return {
+      **signature,
+      "pref_a": tf.TensorSpec(shape=[None], dtype=tf.int32),
+      "pref_b": tf.TensorSpec(shape=[None], dtype=tf.int32)
+    }
   return pref_enc
+
 
 encodings = dict(
   wl1=wl1,
-  wl1_pair=pair(wl1),
   wl1_pref=pref(wl1),
   wl2=wl2,
-  wl2_pair=pair(wl2),
   wl2_pref=pref(wl2),
-  float32=float32,
-  binary=float32,
+  float32=vec32,
+  vec32=vec32,
+  binary=vec32,
   multiclass=multiclass
 )
 
@@ -145,7 +140,7 @@ def create_graph_preprocessors(name, encoder, batcher, pref_util_batcher):
     ("graph", "number"), (name, "float32"),
     encoder, batcher)
   create_preprocessor(
-    ("graph", "vector"), (name, "float32"),
+    ("graph", "vector"), (name, "vec32"),
     encoder, batcher)
 
   create_preprocessor(

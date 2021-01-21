@@ -37,7 +37,13 @@ def vec32(meta):
   return tf.TensorSpec(shape=shape, dtype=tf.float32)
 
 def multiclass(meta):
-  return vec32(dict(feature_dim=meta.get("classes", 2)))
+  if "classes" in meta:
+    classes = meta["classes"]
+  elif "max" in meta:
+    classes = 1 + meta["max"] - meta.get("min", 0)
+  else:
+    classes = 2
+  return vec32(dict(feature_dim=classes))
 
 def pref(enc):
   def pref_enc(meta):
@@ -136,13 +142,18 @@ def create_preprocessor(
   return Preprocessor
 
 def create_graph_preprocessors(name, encoder, batcher, pref_util_batcher):
+  # Regression:
   create_preprocessor(
-    ("graph", "number"), (name, "float32"),
+    ("graph", "integer"), (name, "float32"),
+    encoder, batcher)
+  create_preprocessor(
+    ("graph", "float"), (name, "float32"),
     encoder, batcher)
   create_preprocessor(
     ("graph", "vector"), (name, "vec32"),
     encoder, batcher)
 
+  # Classification:
   create_preprocessor(
     ("graph", "binary"), (name, "binary"),
     encoder, batcher)
@@ -151,14 +162,19 @@ def create_graph_preprocessors(name, encoder, batcher, pref_util_batcher):
     encoder, batcher,
     cls_enc.MulticlassEncoder)
   create_preprocessor(
-    ("graph", "class"), (name, "multiclass"),
+    ("graph", "integer"), (name, "multiclass"),
     encoder, batcher,
     cls_enc.MulticlassEncoder)
 
+  # Ranking:
   create_preprocessor(
-    ("graph", "number"), (f"{name}_pref", "binary"),
+    ("graph", "integer"), (f"{name}_pref", "binary"),
     encoder, pref_util_batcher,
     io_batcher=True)  # pref_util_batcher processes (graphs, utils) tuples
+  create_preprocessor(
+    ("graph", "float"), (f"{name}_pref", "binary"),
+    encoder, pref_util_batcher,
+    io_batcher=True)
 
 
 create_graph_preprocessors(

@@ -80,13 +80,16 @@ def experiment(provider, model, log=True, **config):
 
 
 # provider = syn.triangle_classification_dataset()
-provider = syn.triangle_count_dataset()
+# provider = syn.triangle_count_dataset()
 # provider = tu.ZINC()
 # provider = tu.Mutag()
-model = gnn.RankWL2GNN
+provider = tu.Reddit5K()
+# provider.dataset
+fy.first(provider.get(("wl1", "multiclass")))
+# model = gnn.RankWL2GNN
 # model = gnn.RankGIN
 
-experiment(provider, model, batch_size_limit=10000, log=False)
+# experiment(provider, model, batch_size_limit=10000, log=False)
 
 # splits = provider.get_split(("wl1", "float32"), dict(batch_size_limit=500))
 # provider.get_test_split(outer_idx=5)[1]

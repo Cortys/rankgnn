@@ -9,10 +9,10 @@ DD = tu_dataset("DD", type="binary")
 IMDBBinary = tu_dataset("IMDB-BINARY", type="binary")
 
 # Multiclass:
-Reddit5K = tu_dataset("REDDIT-MULTI-5K", type="multiclass", classes=5)
-IMDBMulti = tu_dataset("IMDB-MULTI", type="multiclass", classes=3)
+Reddit5K = tu_dataset("REDDIT-MULTI-5K", type="integer", min=1, max=5)
+IMDBMulti = tu_dataset("IMDB-MULTI", type="integer", min=1, max=3)
 
 # Regression:
 ZINC = presplit_tu_dataset(
   "ZINC", "ZINC_train", "ZINC_val", "ZINC_test",
-  type="number")
+  type="float")

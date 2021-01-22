@@ -2,7 +2,6 @@ import tensorflow as tf
 import tensorflow.keras as keras
 
 import graspe.utils as utils
-from graspe.utils import fully_tolerant
 import graspe.preprocessing.preprocessor as preprocessor
 import graspe.preprocessing.graph.wl1 as wl1_enc
 import graspe.preprocessing.graph.wl2 as wl2_enc

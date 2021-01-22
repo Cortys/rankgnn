@@ -32,11 +32,12 @@ def experiment(provider, model, log=True, **config):
     in_enc=in_enc, out_enc=out_enc,
     in_meta=provider.in_meta, out_meta=provider.out_meta,
     conv_layer_units=[dim, dim, dim],
-    att_conv_layer_units=[dim, dim, 1],
+    att_conv_layer_units=[dim, dim, dim],
     fc_layer_units=[dim, dim, edim],
+    cmp_layer_units=[dim],
     activation="sigmoid", inner_activation="relu",
     # att_conv_activation="relu",
-    pooling="softmax")
+    pooling="sum")
   print("Instanciated model.")
   if provider.dataset_size < 10:
     ds_train = provider.get(enc)
@@ -80,16 +81,15 @@ def experiment(provider, model, log=True, **config):
 
 
 # provider = syn.triangle_classification_dataset()
-# provider = syn.triangle_count_dataset()
+provider = syn.triangle_count_dataset()
 # provider = tu.ZINC()
 # provider = tu.Mutag()
-provider = tu.Reddit5K()
-# provider.dataset
-fy.first(provider.get(("wl1", "multiclass")))
-# model = gnn.RankWL2GNN
-# model = gnn.RankGIN
+# provider = tu.Reddit5K()
 
-# experiment(provider, model, batch_size_limit=10000, log=False)
+# provider.dataset
+model = gnn.CmpGIN
+
+experiment(provider, model, batch_size_limit=10000, log=False)
 
 # splits = provider.get_split(("wl1", "float32"), dict(batch_size_limit=500))
 # provider.get_test_split(outer_idx=5)[1]

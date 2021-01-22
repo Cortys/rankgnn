@@ -16,10 +16,12 @@ def pipeline_step(f=None, macro=False, share_prefix=False):
   def step(*args, prefix=None, **kwargs1):
     @fy.wraps(f)
     def execute(input, **kwargs2):
-      kwargs = fy.merge(kwargs2, kwargs1)
-
       if prefix is not None:
-        select_prefixed_keys(kwargs2, prefix + "_", target=kwargs)
+        kwargs3 = select_prefixed_keys(kwargs2, prefix + "_")
+      else:
+        kwargs3 = {}
+
+      kwargs = fy.merge(kwargs2, kwargs3, kwargs1)
 
       if share_prefix:
         res = f(input, *args, prefix=prefix, **kwargs)

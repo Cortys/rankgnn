@@ -66,6 +66,7 @@ def index_selector(idx):
 
 
 Dense = utils.tolerant(keras.layers.Dense, ignore_varkwargs=True)
+Activation = utils.tolerant(keras.layers.Activation, ignore_varkwargs=True)
 
 GIN = ck.create_model("GIN", [
   inputs,
@@ -83,26 +84,38 @@ WL2GNN = ck.create_model("WL2GNN", [
   input_encodings=["wl2"],
   output_encodings=global_target_encs)
 
-RankGIN = ck.create_model("RankGIN", [
-  inputs,
-  ([pooled_layers(wl1.GINLayer),
-    cm.with_layers(Dense, prefix="fc")],
-   index_selector("pref_a"), index_selector("pref_b")),
-  cm.merge_ios,
-  cm.with_layer(pref.PrefLookupLayer),
-  cm.with_layer(Dense, units=1, activation="tanh", use_bias=False),
-  cm.with_layer(pref.PrefToBinaryLayer)],
-  input_encodings=["wl1_pref"],
-  output_encodings=["binary"])
+def createDirectRankGNN(name, gnnLayer, enc):
+  return ck.create_model(name, [
+    inputs,
+    ([pooled_layers(gnnLayer),
+      cm.with_layers(Dense, prefix="fc")],
+     index_selector("pref_a"), index_selector("pref_b")),
+    cm.merge_ios,
+    cm.with_layer(pref.PrefLookupLayer),
+    cm.with_layer(pref.PrefDiffLayer),
+    cm.with_layer(Dense, units=1, activation="sigmoid", use_bias=False),
+    finalize],
+    input_encodings=[f"{enc}_pref"],
+    output_encodings=["binary"])
 
-RankWL2GNN = ck.create_model("RankWL2GNN", [
-  inputs,
-  ([pooled_layers(wl2.WL2Layer),
-    cm.with_layers(Dense, prefix="fc")],
-   index_selector("pref_a"), index_selector("pref_b")),
-  cm.merge_ios,
-  cm.with_layer(pref.PrefLookupLayer),
-  cm.with_layer(Dense, units=1, activation="tanh", use_bias=False),
-  cm.with_layer(pref.PrefToBinaryLayer)],
-  input_encodings=["wl2_pref"],
-  output_encodings=["binary"])
+def createCmpGNN(name, gnnLayer, enc):
+  return ck.create_model(name, [
+    inputs,
+    ([pooled_layers(gnnLayer),
+      cm.with_layers(Dense, prefix="fc")],
+     index_selector("pref_a"), index_selector("pref_b")),
+    cm.merge_ios,
+    cm.with_layer(pref.PrefLookupLayer),
+    cm.with_layers(pref.CmpLayer, prefix="cmp"),
+    cm.with_layer(pref.CmpLayer, units=1, prefix="cmp"),
+    cm.with_layer(pref.PrefDiffLayer),
+    cm.with_layer(Activation, activation="sigmoid"),
+    finalize],
+    input_encodings=[f"{enc}_pref"],
+    output_encodings=["binary"])
+
+
+DirectRankGIN = createDirectRankGNN("DirectRankGIN", wl1.GINLayer, "wl1")
+DirectRankWL2GNN = createDirectRankGNN("DirectRankWL2GNN", wl2.WL2Layer, "wl2")
+CmpGIN = createCmpGNN("CmpGIN", wl1.GINLayer, "wl1")
+CmpWL2GNN = createCmpGNN("CmpWL2GNN", wl2.WL2Layer, "wl2")

@@ -47,6 +47,15 @@ def validate_model_encs(input_encodings, output_encodings):
     return input
   return validator
 
+def add_enc(model, in_enc=None, out_enc=None):
+  try:
+    if in_enc is not None:
+      model.in_enc = in_enc
+    if out_enc is not None:
+      model.out_enc = out_enc
+  finally:
+    return model
+
 def create_model(
   as_model, name, steps, extend_at=None,
   input_encodings=[], output_encodings=[],
@@ -55,7 +64,7 @@ def create_model(
   output_encodings = set(output_encodings)
   modelFactory = pipeline.create_pipeline(
     [validate_model_encs(input_encodings, output_encodings),
-     *steps, as_model(name)],
+     *steps, as_model(name), add_enc],
     **kwargs)
 
   def extend(

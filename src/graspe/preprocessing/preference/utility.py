@@ -62,43 +62,77 @@ class PreferenceAggregator:
       "pref_b": pref_b
     }, np.ones(len(pref_a))
 
+def is_pair(elements):
+  return isinstance(elements, tuple) and len(elements) == 2
+
 class UtilityPreferenceBatcher(batcher.Batcher, metaclass=ABCMeta):
   name = "util_pref"
 
-  def __init__(self, in_meta, out_meta, **config):
+  def __init__(
+    self, in_meta=None, out_meta=None,
+    mode="train_neighbors", pivot_partitions=None,
+    **config):
     super().__init__(**config)
+    self.mode = mode
+    self.pivot_partitions = pivot_partitions
 
   def preprocess(self, elements):
-    objects, us = elements
-    sort_idx = np.argsort(us)
+    if self.mode == "train_neighbors":
+      assert is_pair(elements), "Utilities are required during training."
+      objects, us = elements
+      sort_idx = np.argsort(us)
 
-    return objects, us, sort_idx
+      return objects, us, sort_idx
+    elif self.mode == "pivot_partitions":
+      objects = elements[0] if is_pair(elements) else elements
+      return objects
+    else:
+      raise AssertionError(f"Unknown mode '{self.mode}'.")
+
+  def __iterate_train_neighbors(self, elements):
+    if self.mode == "train_neighbors":
+      objects, us, sort_idx = elements
+      olen = objects.size
+      u_max = np.NINF
+      prev_part = None
+      curr_part = []
+      i = 0
+
+      while i < olen:
+        idx = sort_idx[i]
+        u = us[idx]
+
+        if u_max < u:
+          prev_part = curr_part
+          curr_part = []
+          u_max = u
+
+        for p_idx in prev_part:
+          yield p_idx, idx
+
+        curr_part.append(idx)
+        i += 1
+
+  def __iterate_pivot_partitions(self, objects):
+    partitions = self.pivot_partitions
+    assert partitions is not None
+
+    for partition in partitions:
+      pivot_idx = partition[0]
+      rest_idxs = partition[1:]
+      for idx in rest_idxs:
+        yield pivot_idx, idx
 
   def iterate(self, elements):
-    objects, us, sort_idx = elements
-    olen = objects.size
-    u_max = np.NINF
-    prev_part = None
-    curr_part = []
-    i = 0
-
-    while i < olen:
-      idx = sort_idx[i]
-      u = us[idx]
-
-      if u_max < u:
-        prev_part = curr_part
-        curr_part = []
-        u_max = u
-
-      for p_idx in prev_part:
-        yield p_idx, idx
-
-      curr_part.append(idx)
-      i += 1
+    if self.mode == "train_neighbors":
+      yield from self.__iterate_train_neighbors(elements)
+    elif self.mode == "pivot_partitions":
+      yield from self.__iterate_pivot_partitions(elements)
+    else:
+      raise AssertionError(f"Unknown mode '{self.mode}'.")
 
   def create_aggregator(self, elements):
-    objects = elements[0]
+    objects = elements if self.mode == "pivot_partitions" else elements[0]
 
     return PreferenceAggregator(objects)
 

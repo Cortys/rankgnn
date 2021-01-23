@@ -175,9 +175,7 @@ class DatasetProvider:
       preprocessor, lambda: self.dataset,
       indices, train_indices, index_id, finalize)
 
-  def get_split(
-    self, enc=None, config=None, outer_idx=None, inner_idx=None,
-    only=None, finalize=True):
+  def get_split_indices(self, outer_idx=None, inner_idx=None):
     outer_idx = outer_idx or 0
     inner_idx = inner_idx or 0
     assert (outer_idx == 0 or outer_idx < self.outer_k) \
@@ -187,6 +185,27 @@ class DatasetProvider:
     test_idxs = split["test"]
     train_idxs = inner_fold["train"]
     val_idxs = inner_fold["validation"]
+
+    return train_idxs, val_idxs, test_idxs
+
+  def get_train_split_indices(self, outer_idx=None, inner_idx=None):
+    return self.get_split_indices(outer_idx, inner_idx)[0]
+
+  def get_validation_split_indices(self, outer_idx=None, inner_idx=None):
+    return self.get_split_indices(outer_idx, inner_idx)[1]
+
+  def get_test_split_indices(self, outer_idx=None, inner_idx=None):
+    return self.get_split_indices(outer_idx, inner_idx)[2]
+
+  def get_split(
+    self, enc=None, config=None, outer_idx=None, inner_idx=None,
+    only=None, finalize=True, indices=None):
+    assert indices is None or only is not None, \
+        "Index subsets can only be provided if a single split is requested."
+    outer_idx = outer_idx or 0
+    inner_idx = inner_idx or 0
+    train_idxs, val_idxs, test_idxs = self.get_split_indices(
+      outer_idx, inner_idx)
     pre = self._get_preprocessor(enc, config)
     no_validation = config is not None and config.get("no_validation", False)
 
@@ -194,6 +213,9 @@ class DatasetProvider:
       train_idxs = np.concatenate([train_idxs, val_idxs])
 
     if only is None or only == "train":
+      if indices is not None:
+        train_idxs = train_idxs[indices]
+
       train_ds = self.get(
         enc, indices=train_idxs, preprocessor=pre,
         index_id=(outer_idx, inner_idx, "train"), finalize=finalize)
@@ -201,6 +223,9 @@ class DatasetProvider:
         return train_ds
 
     if only is None or only == "test":
+      if indices is not None:
+        test_idxs = test_idxs[indices]
+
       test_ds = self.get(
         enc, indices=test_idxs, train_indices=train_idxs, preprocessor=pre,
         index_id=(outer_idx, inner_idx, "test"), finalize=finalize)
@@ -208,8 +233,11 @@ class DatasetProvider:
         return test_ds
 
     if not no_validation:
+      if indices is not None:
+        val_idxs = val_idxs[indices]
+
       val_ds = self.get(
-        enc, indices=train_idxs, train_indices=train_idxs, preprocessor=pre,
+        enc, indices=val_idxs, train_indices=train_idxs, preprocessor=pre,
         index_id=(outer_idx, inner_idx, "val"), finalize=finalize)
       if only is None:
         return train_ds, val_ds, test_ds
@@ -222,23 +250,32 @@ class DatasetProvider:
 
   def get_train_split(
     self, enc=None, config=None,
-    outer_idx=None, inner_idx=None, finalize=True):
-    return self.get_split(enc, config, outer_idx, inner_idx, "train", finalize)
+    outer_idx=None, inner_idx=None, finalize=True, indices=None):
+    return self.get_split(
+      enc, config, outer_idx, inner_idx, "train", finalize, indices)
 
   def get_validation_split(
     self, enc=None, config=None,
-    outer_idx=None, inner_idx=None, finalize=True):
-    return self.get_split(enc, config, outer_idx, inner_idx, "val", finalize)
+    outer_idx=None, inner_idx=None, finalize=True, indices=None):
+    return self.get_split(
+      enc, config, outer_idx, inner_idx, "val", finalize, indices)
 
   def get_test_split(
     self, enc=None, config=None,
-    outer_idx=None, inner_idx=None, finalize=True):
-    return self.get_split(enc, config, outer_idx, inner_idx, "test", finalize)
+    outer_idx=None, inner_idx=None, finalize=True, indices=None):
+    return self.get_split(
+      enc, config, outer_idx, inner_idx, "test", finalize, indices)
 
   def stats(self):
     return self.loader.stats(self._cache_dataset(only_meta=False))
 
-  def find_compatible_encoding(self, input_encodings, output_encodings):
+  def find_compatible_encoding(self, input_encodings, output_encodings=None):
+    if output_encodings is None:
+      if hasattr(input_encodings, "input_encodings") \
+        and hasattr(input_encodings, "output_encodings"):
+        output_encodings = input_encodings.output_encodings
+        input_encodings = input_encodings.input_encodings
+
     compatible_encodings = preproc.find_encodings(self.dataset_type)
     in_set = set(input_encodings)
     out_set = set(output_encodings)
@@ -461,15 +498,29 @@ class PresplitDatasetProvider(DatasetProvider):
   def get(self, *args, **kwargs):
     raise Exception("Presplit datasets cannot be resliced.")
 
+  def get_split_indices(self, outer_idx=None, inner_idx=None):
+    raise Exception("Presplit datasets cannot be resliced.")
+
+  def get_train_split_indices(self, outer_idx=None, inner_idx=None):
+    return self.get_split_indices(outer_idx, inner_idx)[0]
+
+  def get_validation_split_indices(self, outer_idx=None, inner_idx=None):
+    return self.get_split_indices(outer_idx, inner_idx)[1]
+
+  def get_test_split_indices(self, outer_idx=None, inner_idx=None):
+    return self.get_split_indices(outer_idx, inner_idx)[2]
+
   def get_split(
     self, enc=None, config=None, outer_idx=None, inner_idx=None,
-    only=None, finalize=True):
+    only=None, finalize=True, indices=None):
+    assert indices is None or only is not None, \
+        "Index subsets can only be provided if a single split is requested."
     pre = self._get_preprocessor(enc, config)
     res = ()
     if only is None or only == "train":
       train_ds = self._preprocess(
         pre, lambda: self.train_dataset,
-        None, None, None, finalize, ("train",))
+        indices, None, None, finalize, ("train",))
       if only == "train":
         return train_ds
       else:
@@ -478,14 +529,14 @@ class PresplitDatasetProvider(DatasetProvider):
     if self.loader.val and (only is None or only == "val"):
       val_ds = self._preprocess(
         pre, lambda: self.validation_dataset,
-        None, None, None, finalize, ("val",))
+        indices, None, None, finalize, ("val",))
       if only == "val":
         return val_ds
       res += (val_ds,)
     if self.loader.test and (only is None or only == "test"):
       test_ds = self._preprocess(
         pre, lambda: self.test_dataset,
-        None, None, None, finalize, ("test",))
+        indices, None, None, finalize, ("test",))
       if only == "test":
         return test_ds
       res += (test_ds,)

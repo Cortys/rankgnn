@@ -16,6 +16,7 @@ import graspe.preprocessing.preprocessor as preprocessor
 import graspe.preprocessing.tf as tf_enc
 import graspe.utils as utils
 import graspe.models.gnn as gnn
+import graspe.models.sort as sort
 
 # -%% codecell
 
@@ -23,8 +24,7 @@ def time_str():
   return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
 def experiment(provider, model, log=True, **config):
-  enc = fy.first(provider.find_compatible_encoding(
-    model.input_encodings, model.output_encodings))
+  enc = fy.first(provider.find_compatible_encoding(model))
   in_enc, out_enc = enc
   dim = 64
   edim = 64
@@ -42,12 +42,12 @@ def experiment(provider, model, log=True, **config):
   if provider.dataset_size < 10:
     ds_train = provider.get(enc)
     ds_val, ds_test = ds_train, ds_train
-    targets = provider.dataset[1]
+    #  targets = provider.dataset[1]
   else:
     ds_train, ds_val, ds_test = provider.get_split(
       enc, config=config,
       outer_idx=5)
-    targets = provider.get_test_split(outer_idx=5)[1]
+    #  targets = provider.get_test_split(outer_idx=5)[1]
 
   print("Loaded encoded datasets.")
   provider.unload_dataset()
@@ -73,11 +73,11 @@ def experiment(provider, model, log=True, **config):
   m.fit(
     ds_train.cache(),
     validation_data=ds_val.cache(),
-    epochs=5000, verbose=2,
+    epochs=400, verbose=2,
     callbacks=[tb] if log else [])
-  m.evaluate(ds_test)
+
   print(np.around(m.predict(ds_test), 2))
-  print(targets)
+  return m
 
 
 # provider = syn.triangle_classification_dataset()
@@ -87,9 +87,15 @@ provider = syn.triangle_count_dataset()
 # provider = tu.Reddit5K()
 
 # provider.dataset
-model = gnn.CmpGIN
+model = gnn.DirectRankWL2GNN
 
-experiment(provider, model, batch_size_limit=10000, log=False)
+m = experiment(provider, model, batch_size_limit=10000, log=False)
+indices = provider.get_test_split_indices(outer_idx=5)
+ys = provider.get_test_split(outer_idx=5)[1]
+print(indices)
+print(ys)
+print(indices[np.argsort(ys)])
+print(sort.model_sort(indices, provider.get, m))
 
 # splits = provider.get_split(("wl1", "float32"), dict(batch_size_limit=500))
 # provider.get_test_split(outer_idx=5)[1]

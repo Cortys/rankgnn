@@ -47,7 +47,7 @@ class SyntheticGraphEmbedDatasetLoader(SyntheticDatasetLoader):
 
   @property
   def stratifiable(self):
-    return self.config["type"] in {"binary", "multiclass"}
+    return loader.is_stratifiable(self.config["type"], self.config)
 
   def compute_meta(self, elements):
     gs, ys = elements

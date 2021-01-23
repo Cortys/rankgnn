@@ -23,7 +23,7 @@ class TUDatasetLoader(loader.DatasetLoader):
 
   @property
   def stratifiable(self):
-    return self.config["type"] in {"binary", "multiclass"}
+    return loader.is_stratifiable(self.config["type"], self.config)
 
   @property
   def download_url(self):

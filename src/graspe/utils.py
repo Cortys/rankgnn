@@ -313,7 +313,7 @@ def cache_write(file, data, format="pickle"):
 
 def cache(f, file, format="pickle"):
   if file.exists():
-    cache_read(file, format)
+    return cache_read(file, format)
 
   res = f()
   cache_write(file, res, format)

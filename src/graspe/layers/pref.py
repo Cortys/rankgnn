@@ -24,6 +24,15 @@ class PrefDiffLayer(keras.layers.Layer):
 
     return X_b - X_a
 
+class PrefQuotientLayer(keras.layers.Layer):
+  def __init__(self):
+    super().__init__()
+
+  def call(self, input):
+    X_a, X_b = input
+
+    return tf.math.divide_no_nan(X_a, X_a + X_b)
+
 class CmpLayer(keras.layers.Layer):
   def __init__(self, units, use_bias=True, activation=None):
     super().__init__()

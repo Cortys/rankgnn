@@ -87,7 +87,7 @@ provider = syn.triangle_count_dataset()
 # provider = tu.Reddit5K()
 
 # provider.dataset
-model = gnn.DirectRankWL2GNN
+model = gnn.CmpGIN
 
 m = experiment(provider, model, batch_size_limit=40000, log=False)
 train_idxs, val_idxs, test_idxs = provider.get_split_indices(outer_idx=5)

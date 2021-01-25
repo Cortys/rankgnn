@@ -73,7 +73,7 @@ def experiment(provider, model, log=True, **config):
   m.fit(
     ds_train.cache(),
     validation_data=ds_val.cache(),
-    epochs=400, verbose=2,
+    epochs=1000, verbose=2,
     callbacks=[tb] if log else [])
 
   print(np.around(m.predict(ds_test), 2))
@@ -89,13 +89,11 @@ provider = syn.triangle_count_dataset()
 # provider.dataset
 model = gnn.DirectRankWL2GNN
 
-m = experiment(provider, model, batch_size_limit=10000, log=False)
-indices = provider.get_test_split_indices(outer_idx=5)
-ys = provider.get_test_split(outer_idx=5)[1]
-print(indices)
-print(ys)
-print(indices[np.argsort(ys)])
-print(sort.model_sort(indices, provider.get, m))
+m = experiment(provider, model, batch_size_limit=40000, log=False)
+train_idxs, val_idxs, test_idxs = provider.get_split_indices(outer_idx=5)
+print("Train", sort.evaluate_model_sort(train_idxs, provider.get, m))
+print("Val", sort.evaluate_model_sort(val_idxs, provider.get, m))
+print("Test", sort.evaluate_model_sort(test_idxs, provider.get, m))
 
 # splits = provider.get_split(("wl1", "float32"), dict(batch_size_limit=500))
 # provider.get_test_split(outer_idx=5)[1]

@@ -485,6 +485,18 @@ class PresplitDatasetProvider(DatasetProvider):
     )
 
   @property
+  def train_dataset_size(self):
+    return self.dataset_split_sizes["train"]
+
+  @property
+  def validation_dataset_size(self):
+    return self.dataset_split_sizes["val"]
+
+  @property
+  def test_dataset_size(self):
+    return self.dataset_split_sizes["test"]
+
+  @property
   def dataset_size(self):
     return sum(fy.keep(self.dataset_split_sizes.values()))
 
@@ -502,13 +514,13 @@ class PresplitDatasetProvider(DatasetProvider):
     raise Exception("Presplit datasets cannot be resliced.")
 
   def get_train_split_indices(self, outer_idx=None, inner_idx=None):
-    return self.get_split_indices(outer_idx, inner_idx)[0]
+    return np.arange(self.train_dataset_size)
 
   def get_validation_split_indices(self, outer_idx=None, inner_idx=None):
-    return self.get_split_indices(outer_idx, inner_idx)[1]
+    return np.arange(self.validation_dataset_size)
 
   def get_test_split_indices(self, outer_idx=None, inner_idx=None):
-    return self.get_split_indices(outer_idx, inner_idx)[2]
+    return np.arange(self.test_dataset_size)
 
   def get_split(
     self, enc=None, config=None, outer_idx=None, inner_idx=None,

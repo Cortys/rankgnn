@@ -1,5 +1,7 @@
 import numpy as np
 
+import graspe.metrics.rank as rank_metric
+
 def sort(indices, compare):
   n = len(indices)
 
@@ -64,3 +66,10 @@ def model_sort(indices, provider_get, model, **config):
     return model.predict(data)
 
   return sort(indices, compare)
+
+def evaluate_model_sort(indices, provider_get, model, **config):
+  _, object_rankings = provider_get(indices=indices)
+  predicted_ordering = model_sort(indices, provider_get, model, **config)
+
+  return rank_metric.bucket_sorted_tau(
+    indices, object_rankings, predicted_ordering)

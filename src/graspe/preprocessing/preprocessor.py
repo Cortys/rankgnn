@@ -17,7 +17,9 @@ class Preprocessor:
   in_encoder_gen = lambda: encoder.Encoder.identity
   out_encoder_gen = in_encoder_gen
 
-  def __init__(self, in_meta=None, out_meta=None, config=None):
+  def __init__(
+    self, in_meta=None, out_meta=None, config=None,
+    reconfigurable_finalization=False):
     super().__init__()
     if in_meta is None:
       in_meta = {}
@@ -25,6 +27,11 @@ class Preprocessor:
       config = {}
 
     self.config = config
+    self.reconfigurable_finalization = reconfigurable_finalization
+
+    if self.reconfigurable_finalization:
+      self.finalized_cacheable = False
+
     self.in_config = select_prefixed_keys(config, "in_", True)
     self.out_config = select_prefixed_keys(config, "out_", True)
     self.in_meta = in_meta
@@ -67,6 +74,9 @@ class Preprocessor:
     return self.encoder.slice(elements, indices, train_indices)
 
   def finalize(self, elements):
+    if self.reconfigurable_finalization:
+      return lambda **kwargs: elements  # no reconfiguration possible here.
+
     return elements
 
   def transform(
@@ -85,26 +95,53 @@ class BatchingPreprocessor(Preprocessor):
   in_batcher_gen = lambda **kwargs: tolerant(batcher.Batcher)(**kwargs)
   out_batcher_gen = in_batcher_gen
 
-  def __init__(self, in_meta=None, out_meta=None, config=None):
-    super().__init__(in_meta, out_meta, config)
+  def __init__(
+    self, in_meta=None, out_meta=None, config=None,
+    reconfigurable_finalization=False):
+    super().__init__(in_meta, out_meta, config, reconfigurable_finalization)
 
     in_bat_cls = tolerant_method(self.in_batcher_gen)
 
     if out_meta is None:
-      self.batcher = in_bat_cls(**self.in_args)
+      if self.reconfigurable_finalization:
+        self.batcher = lambda config: in_bat_cls(
+          **fy.merge(self.in_args, config))
+      else:
+        self.batcher = in_bat_cls(**self.in_args)
     else:
       if self.out_batcher_gen is None:
-        self.batcher = in_bat_cls(self.in_args, self.out_args, **self.config)
+        if self.reconfigurable_finalization:
+          self.batcher = lambda config: in_bat_cls(
+            self.in_args, self.out_args, **fy.merge(self.config, config))
+        else:
+          self.batcher = in_bat_cls(self.in_args, self.out_args, **self.config)
       else:
-        in_bat = in_bat_cls(**self.in_args)
-        out_bat = tolerant_method(self.out_batcher_gen)(**self.out_args)
-        self.batcher = transformer.tuple(in_bat, out_bat)
+        if self.reconfigurable_finalization:
+          def bat_gen(config):
+            in_bat = in_bat_cls(**fy.merge(self.in_args, config))
+            out_bat = tolerant_method(self.out_batcher_gen)(
+              **fy.merge(self.out_args, config))
+            return transformer.tuple(in_bat, out_bat)
+
+          self.batcher = bat_gen
+        else:
+          in_bat = in_bat_cls(**self.in_args)
+          out_bat = tolerant_method(self.out_batcher_gen)(**self.out_args)
+          self.batcher = transformer.tuple(in_bat, out_bat)
 
   @property
   def finalized_name(self):
     return self.batcher.name
 
   def finalize(self, elements):
+    if self.reconfigurable_finalization:
+      bat_gen = tolerant_method(self.batcher)
+
+      def reconfigurable_finalizer(**config):
+        return bat_gen(**config).transform(elements)
+
+      return reconfigurable_finalizer
+
     return self.batcher.transform(elements)
 
 class DefaultPreprocessor(Preprocessor):

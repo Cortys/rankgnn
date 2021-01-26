@@ -39,7 +39,7 @@ def pool(input, pooling="mean"):
   return pool(input)
 
 @cm.model_step(macro=True)
-def pooled_layers(_, conv_layer, pooling=None):
+def graph_embed(_, conv_layer, pooling=None):
   conv_layers = cm.with_layers(conv_layer, prefix="conv")
 
   if pooling == "softmax":
@@ -70,7 +70,7 @@ Activation = utils.tolerant(keras.layers.Activation, ignore_varkwargs=True)
 
 GIN = ck.create_model("GIN", [
   inputs,
-  pooled_layers(wl1.GINLayer),
+  graph_embed(wl1.GINLayer),
   cm.with_layers(Dense, prefix="fc"),
   finalize],
   input_encodings=["wl1"],
@@ -78,7 +78,7 @@ GIN = ck.create_model("GIN", [
 
 WL2GNN = ck.create_model("WL2GNN", [
   inputs,
-  pooled_layers(wl2.WL2Layer),
+  graph_embed(wl2.WL2Layer),
   cm.with_layers(Dense, prefix="fc"),
   finalize],
   input_encodings=["wl2"],
@@ -87,7 +87,7 @@ WL2GNN = ck.create_model("WL2GNN", [
 def createDirectRankGNN(name, gnnLayer, enc):
   return ck.create_model(name, [
     inputs,
-    ([pooled_layers(gnnLayer),
+    ([graph_embed(gnnLayer),
       cm.with_layers(Dense, prefix="fc")],
      index_selector("pref_a"), index_selector("pref_b")),
     cm.merge_ios,
@@ -101,7 +101,7 @@ def createDirectRankGNN(name, gnnLayer, enc):
 def createCmpGNN(name, gnnLayer, enc):
   return ck.create_model(name, [
     inputs,
-    ([pooled_layers(gnnLayer),
+    ([graph_embed(gnnLayer),
       cm.with_layers(Dense, prefix="fc")],
      index_selector("pref_a"), index_selector("pref_b")),
     cm.merge_ios,

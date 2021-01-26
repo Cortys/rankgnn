@@ -143,9 +143,9 @@ class DatasetProvider:
         for train_o, test_o, strat_o in self.__make_kfold_splits(
           self.outer_k, all_idxs, strat_labels)]
 
-  def _get_preprocessor(self, enc, config):
+  def _get_preprocessor(self, enc, config, reconfigurable_finalization=False):
     return preproc.find_preprocessor(self.dataset_type, enc)(
-      self.in_meta, self.out_meta, config)
+      self.in_meta, self.out_meta, config, reconfigurable_finalization)
 
   def _preprocess(
     self, pre: preproc.Preprocessor, ds_get, indices, train_indices,
@@ -157,9 +157,11 @@ class DatasetProvider:
     indices=None, train_indices=None,
     preprocessor=None,
     shuffle=False,
-    index_id=None, finalize=True):
+    index_id=None, finalize=True,
+    reconfigurable_finalization=False):
     if preprocessor is None:
-      preprocessor = self._get_preprocessor(enc, config)
+      preprocessor = self._get_preprocessor(
+        enc, config, reconfigurable_finalization)
 
     if shuffle:
       if indices is None:
@@ -199,14 +201,15 @@ class DatasetProvider:
 
   def get_split(
     self, enc=None, config=None, outer_idx=None, inner_idx=None,
-    only=None, finalize=True, indices=None):
+    only=None, finalize=True, reconfigurable_finalization=False,
+    indices=None):
     assert indices is None or only is not None, \
         "Index subsets can only be provided if a single split is requested."
     outer_idx = outer_idx or 0
     inner_idx = inner_idx or 0
     train_idxs, val_idxs, test_idxs = self.get_split_indices(
       outer_idx, inner_idx)
-    pre = self._get_preprocessor(enc, config)
+    pre = self._get_preprocessor(enc, config, reconfigurable_finalization)
     no_validation = config is not None and config.get("no_validation", False)
 
     if no_validation:
@@ -250,21 +253,27 @@ class DatasetProvider:
 
   def get_train_split(
     self, enc=None, config=None,
-    outer_idx=None, inner_idx=None, finalize=True, indices=None):
+    outer_idx=None, inner_idx=None, finalize=True,
+    reconfigurable_finalization=False, indices=None):
     return self.get_split(
-      enc, config, outer_idx, inner_idx, "train", finalize, indices)
+      enc, config, outer_idx, inner_idx, "train", finalize,
+      reconfigurable_finalization, indices)
 
   def get_validation_split(
     self, enc=None, config=None,
-    outer_idx=None, inner_idx=None, finalize=True, indices=None):
+    outer_idx=None, inner_idx=None, finalize=True,
+    reconfigurable_finalization=False, indices=None):
     return self.get_split(
-      enc, config, outer_idx, inner_idx, "val", finalize, indices)
+      enc, config, outer_idx, inner_idx, "val", finalize,
+      reconfigurable_finalization, indices)
 
   def get_test_split(
     self, enc=None, config=None,
-    outer_idx=None, inner_idx=None, finalize=True, indices=None):
+    outer_idx=None, inner_idx=None, finalize=True,
+    reconfigurable_finalization=False, indices=None):
     return self.get_split(
-      enc, config, outer_idx, inner_idx, "test", finalize, indices)
+      enc, config, outer_idx, inner_idx, "test", finalize,
+      reconfigurable_finalization, indices)
 
   def stats(self):
     return self.loader.stats(self._cache_dataset(only_meta=False))
@@ -510,9 +519,6 @@ class PresplitDatasetProvider(DatasetProvider):
   def get(self, *args, **kwargs):
     raise Exception("Presplit datasets cannot be resliced.")
 
-  def get_split_indices(self, outer_idx=None, inner_idx=None):
-    raise Exception("Presplit datasets cannot be resliced.")
-
   def get_train_split_indices(self, outer_idx=None, inner_idx=None):
     return np.arange(self.train_dataset_size)
 
@@ -522,12 +528,18 @@ class PresplitDatasetProvider(DatasetProvider):
   def get_test_split_indices(self, outer_idx=None, inner_idx=None):
     return np.arange(self.test_dataset_size)
 
+  def get_split_indices(self, outer_idx=None, inner_idx=None):
+    return (
+      self.get_train_split_indices(),
+      self.get_validation_split_indices(),
+      self.get_test_split_indices())
+
   def get_split(
     self, enc=None, config=None, outer_idx=None, inner_idx=None,
-    only=None, finalize=True, indices=None):
+    only=None, finalize=True, reconfigurable_finalization=False, indices=None):
     assert indices is None or only is not None, \
         "Index subsets can only be provided if a single split is requested."
-    pre = self._get_preprocessor(enc, config)
+    pre = self._get_preprocessor(enc, config, reconfigurable_finalization)
     res = ()
     if only is None or only == "train":
       train_ds = self._preprocess(

@@ -23,18 +23,26 @@ import graspe.models.sort as sort
 def time_str():
   return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
-def experiment(provider, model, log=True, **config):
+def experiment(provider, model, log=True, verbose=2, **config):
   enc = fy.first(provider.find_compatible_encoding(model))
   in_enc, out_enc = enc
   dim = 64
-  edim = 64
+  fc_layer_args = None
+  if "pref" in in_enc:
+    edim = dim
+  elif out_enc == "binary":
+    edim = 1
+  elif out_enc == "float32":
+    edim = 1
+    fc_layer_args = {-1: dict(activation=None)}
   m = model(
     in_enc=in_enc, out_enc=out_enc,
     in_meta=provider.in_meta, out_meta=provider.out_meta,
     conv_layer_units=[dim, dim, dim],
     att_conv_layer_units=[dim, dim, dim],
     fc_layer_units=[dim, dim, edim],
-    cmp_layer_units=[dim],
+    fc_layer_args=fc_layer_args,
+    cmp_layer_units=[edim],
     activation="sigmoid", inner_activation="relu",
     # att_conv_activation="relu",
     pooling="sum")
@@ -53,12 +61,15 @@ def experiment(provider, model, log=True, **config):
   provider.unload_dataset()
   opt = keras.optimizers.Adam(0.0001)
 
-  if out_enc == "float32":
-    loss = "mean_squared_error"
-    metrics = []
-  else:
+  if out_enc == "multiclass":
+    loss = "categorical_crossentropy"
+    metrics = ["categorical_accuracy"]
+  elif out_enc == "binary":
     loss = "binary_crossentropy"
     metrics = ["binary_accuracy"]
+  else:
+    loss = "mean_squared_error"
+    metrics = []
 
   m.compile(
     optimizer=opt, loss=loss, metrics=metrics)
@@ -73,7 +84,7 @@ def experiment(provider, model, log=True, **config):
   m.fit(
     ds_train.cache(),
     validation_data=ds_val.cache(),
-    epochs=1000, verbose=2,
+    epochs=1000, verbose=verbose,
     callbacks=[tb] if log else [])
 
   print(np.around(m.predict(ds_test), 2))
@@ -81,19 +92,28 @@ def experiment(provider, model, log=True, **config):
 
 
 # provider = syn.triangle_classification_dataset()
-provider = syn.triangle_count_dataset()
-# provider = tu.ZINC()
+# provider = syn.triangle_count_dataset()
+provider = tu.ZINC(in_memory_cache=False)
 # provider = tu.Mutag()
 # provider = tu.Reddit5K()
 
 # provider.dataset
-model = gnn.CmpGIN
+# model = gnn.CmpGIN
+model = gnn.DirectRankWL2GNN
 
-m = experiment(provider, model, batch_size_limit=40000, log=False)
+bsl = 10000
+m = experiment(provider, model, batch_size_limit=bsl, log=True, verbose=1)
 train_idxs, val_idxs, test_idxs = provider.get_split_indices(outer_idx=5)
-print("Train", sort.evaluate_model_sort(train_idxs, provider.get, m))
-print("Val", sort.evaluate_model_sort(val_idxs, provider.get, m))
-print("Test", sort.evaluate_model_sort(test_idxs, provider.get, m))
+# train_get = provider.get
+# val_get = provider.get
+# test_get = provider.get
+train_get = provider.get_train_split
+val_get = provider.get_validation_split
+test_get = provider.get_test_split
+# bsl = 1000
+print("Train", sort.evaluate_model_sort(train_idxs, train_get, m, batch_size_limit=bsl))
+print("Val", sort.evaluate_model_sort(val_idxs, val_get, m, batch_size_limit=bsl))
+print("Test", sort.evaluate_model_sort(test_idxs, test_get, m, batch_size_limit=bsl))
 
 # splits = provider.get_split(("wl1", "float32"), dict(batch_size_limit=500))
 # provider.get_test_split(outer_idx=5)[1]

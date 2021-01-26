@@ -11,9 +11,11 @@ def sort(indices, compare):
   sorted_indices = np.zeros(n, dtype=np.int32)
   ranges = [0]
   partitions = [indices]
+  print(f"[dbg] started sorting {n} objects")
   m = 1
-
   while m > 0:
+    todo = sum(len(p) for p in partitions)
+    print(f"[dbg] {m} partitions, still unsorted: {todo}/{len(indices)}")
     comparisons = compare(partitions)
     new_ranges = []
     new_partitions = []
@@ -57,19 +59,30 @@ def sort(indices, compare):
 
 def model_sort(indices, provider_get, model, **config):
   enc = (model.in_enc, model.out_enc)
+  data_getter = provider_get(enc, config={
+    **config, "mode": "pivot_partitions"},
+    reconfigurable_finalization=True)
 
   def compare(partitions):
-    data = provider_get(enc, config={
-      **config,
-      "mode": "pivot_partitions",
-      "pivot_partitions": partitions})
+    data = data_getter(pivot_partitions=partitions)
     return model.predict(data)
 
   return sort(indices, compare)
 
 def evaluate_model_sort(indices, provider_get, model, **config):
+  print("Loading target rankings...")
   _, object_rankings = provider_get(indices=indices)
-  predicted_ordering = model_sort(indices, provider_get, model, **config)
+  print(f"Loaded {len(object_rankings)} target rankings.")
 
+  if "pref" in model.in_enc:
+    predicted_ordering = model_sort(indices, provider_get, model, **config)
+  elif model.out_enc == "float32":
+    data = provider_get((model.in_enc, model.out_enc), indices=indices)
+    predicted_rankings = model.predict(data)
+    predicted_ordering = indices[np.argsort(predicted_rankings)]
+  else:
+    raise Exception(f"Unsupported enc ({model.in_enc}, {model.out_enc}).")
+
+  print("Computing tau...")
   return rank_metric.bucket_sorted_tau(
     indices, object_rankings, predicted_ordering)

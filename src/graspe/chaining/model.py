@@ -101,6 +101,7 @@ def with_layers(
   input, output = io
   layer = pipeline.tolerant(layer)
   hs = [output]
+  layer_count = len(layer_units)
 
   if stack_tf is not None:
     if stack_tf_lookup is not None:
@@ -112,11 +113,16 @@ def with_layers(
 
     stack_tf = pipeline.tolerant(stack_tf)
 
-  for i in range(len(layer_units)):
-    if layer_args is None or layer_args[i] is None:
+  for i in range(layer_count):
+    if layer_args is None:
       args = kwargs
-    else:
+    elif isinstance(layer_args, dict):
+      args = fy.merge(
+        kwargs, layer_args.get(i, layer_args.get(i - layer_count, {})))
+    elif i < layer_count and layer_args[i] is not None:
       args = fy.merge(kwargs, layer_args[i])
+    else:
+      args = kwargs
 
     units = layer_units[i]
     h = hs[i]

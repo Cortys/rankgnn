@@ -107,8 +107,8 @@ class TFPreprocessor(preprocessor.BatchingPreprocessor):
   finalized_format = utils.register_cache_format(
     "tfrecords", load_tfrecords, dump_tfrecords, type="custom")
 
-  def finalize(self, elements):
-    batch_gen = self.batcher.batch_generator(elements)
+  def __finalize_with_batcher(self, elements, batcher):
+    batch_gen = batcher.batch_generator(elements)
     in_enc, out_enc = self.enc
     if not self.has_out:
       out_enc = None
@@ -117,7 +117,14 @@ class TFPreprocessor(preprocessor.BatchingPreprocessor):
       batch_gen,
       in_enc, self.in_args,
       out_enc, self.out_args,
-      self.batcher.lazy_batching)
+      batcher.lazy_batching)
+
+  def finalize(self, elements):
+    if self.reconfigurable_finalization:
+      return lambda **config: self.__finalize_with_batcher(
+        elements, self.batcher(config))
+
+    return self.__finalize_with_batcher(elements, self.batcher)
 
 def create_preprocessor(
   type, enc,

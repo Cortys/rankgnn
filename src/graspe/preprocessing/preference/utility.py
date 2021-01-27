@@ -1,5 +1,6 @@
 from abc import ABCMeta, abstractmethod
 import numpy as np
+import collections
 
 import graspe.preprocessing.batcher as batcher
 
@@ -70,10 +71,12 @@ class UtilityPreferenceBatcher(batcher.Batcher, metaclass=ABCMeta):
 
   def __init__(
     self, in_meta=None, out_meta=None,
-    mode="train_neighbors", pivot_partitions=None,
+    mode="train_neighbors", neighbor_radius=1,
+    pivot_partitions=None,
     **config):
     super().__init__(**config)
     self.mode = mode
+    self.neighbor_radius = neighbor_radius
     self.pivot_partitions = pivot_partitions
 
   def preprocess(self, elements):
@@ -94,7 +97,7 @@ class UtilityPreferenceBatcher(batcher.Batcher, metaclass=ABCMeta):
       objects, us, sort_idx = elements
       olen = objects.size
       u_max = np.NINF
-      prev_part = None
+      prev_parts = collections.deque(maxlen=self.neighbor_radius)
       curr_part = []
       i = 0
 
@@ -103,12 +106,13 @@ class UtilityPreferenceBatcher(batcher.Batcher, metaclass=ABCMeta):
         u = us[idx]
 
         if u_max < u:
-          prev_part = curr_part
+          prev_parts.append(curr_part)
           curr_part = []
           u_max = u
 
-        for p_idx in prev_part:
-          yield p_idx, idx
+        for prev_part in prev_parts:
+          for p_idx in prev_part:
+            yield p_idx, idx
 
         curr_part.append(idx)
         i += 1

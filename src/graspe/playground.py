@@ -101,11 +101,11 @@ provider = tu.ZINC(in_memory_cache=False)
 # provider = tu.Reddit5K()
 
 # provider.dataset
-model = gnn.CmpGIN
-# model = gnn.DirectRankGIN
+# model = gnn.CmpGIN
+model = gnn.DirectRankGIN
 
-bsl = 2000
-m = experiment(provider, model, batch_size_limit=bsl, neighbor_radius=50, log=False, verbose=1)
+bsl = 10000
+m = experiment(provider, model, batch_size_limit=bsl, neighbor_radius=1, min_distance=0.05, log=False, verbose=1)
 train_idxs, val_idxs, test_idxs = provider.get_split_indices(outer_idx=5)
 # train_get = provider.get
 # val_get = provider.get

@@ -71,12 +71,13 @@ class UtilityPreferenceBatcher(batcher.Batcher, metaclass=ABCMeta):
 
   def __init__(
     self, in_meta=None, out_meta=None,
-    mode="train_neighbors", neighbor_radius=1,
+    mode="train_neighbors", neighbor_radius=1, min_distance=0,
     pivot_partitions=None,
     **config):
     super().__init__(**config)
     self.mode = mode
     self.neighbor_radius = neighbor_radius
+    self.min_distance = min_distance
     self.pivot_partitions = pivot_partitions
 
   def preprocess(self, elements):
@@ -98,6 +99,7 @@ class UtilityPreferenceBatcher(batcher.Batcher, metaclass=ABCMeta):
       olen = objects.size
       u_max = np.NINF
       prev_parts = collections.deque(maxlen=self.neighbor_radius)
+      dist = self.min_distance
       curr_part = []
       i = 0
 
@@ -105,14 +107,14 @@ class UtilityPreferenceBatcher(batcher.Batcher, metaclass=ABCMeta):
         idx = sort_idx[i]
         u = us[idx]
 
-        if u_max < u:
+        if u - u_max > dist:
           prev_parts.append(curr_part)
           curr_part = []
           u_max = u
 
         for prev_part in prev_parts:
           for p_idx in prev_part:
-            yield p_idx, idx
+              yield p_idx, idx
 
         curr_part.append(idx)
         i += 1

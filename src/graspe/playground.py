@@ -23,7 +23,7 @@ import graspe.models.sort as sort
 def time_str():
   return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
-def experiment(provider, model, log=True, verbose=2, **config):
+def experiment(provider, model, log=True, verbose=2, epochs=1000, **config):
   enc = fy.first(provider.find_compatible_encoding(model))
   in_enc, out_enc = enc
   dim = 128
@@ -32,7 +32,6 @@ def experiment(provider, model, log=True, verbose=2, **config):
   if "pref" in in_enc:
     edim = dim
     fc_layer_args = {-1: dict(activation=None)}
-    config["batch_size_limit"] *= config.get("neighbor_radius", 1)
   elif out_enc == "binary":
     edim = 1
   elif out_enc == "float32":
@@ -85,12 +84,32 @@ def experiment(provider, model, log=True, verbose=2, **config):
     profile_batch="100,115")
   print("Compiled model.")
   m.fit(
-    ds_train.cache().shuffle(200),
+    ds_train.cache(),
     validation_data=ds_val.cache(),
-    epochs=1000, verbose=verbose,
+    epochs=epochs, verbose=verbose,
     callbacks=[tb] if log else [])
 
   print(np.around(m.predict(ds_test), 2))
+  return m
+
+def sort_experiment(provider, model, **config):
+  bsl = 10000
+  m = experiment(
+    provider, model, batch_size_limit=bsl,
+    mode="train_random",
+    neighbor_radius=1, sample_ratio=0.00002,
+    min_distance=0.001, log=False, verbose=1, **config)
+  train_idxs, val_idxs, test_idxs = provider.get_split_indices(outer_idx=5)
+  # train_get = provider.get
+  # val_get = provider.get
+  # test_get = provider.get
+  train_get = provider.get_train_split
+  val_get = provider.get_validation_split
+  test_get = provider.get_test_split
+  bsl = 1000
+  print("Train", sort.evaluate_model_sort(train_idxs, train_get, m, batch_size_limit=bsl))
+  print("Val", sort.evaluate_model_sort(val_idxs, val_get, m, batch_size_limit=bsl))
+  print("Test", sort.evaluate_model_sort(test_idxs, test_get, m, batch_size_limit=bsl))
   return m
 
 
@@ -103,20 +122,7 @@ provider = tu.ZINC(in_memory_cache=False)
 # provider.dataset
 # model = gnn.CmpGIN
 model = gnn.DirectRankGIN
-
-bsl = 10000
-m = experiment(provider, model, batch_size_limit=bsl, neighbor_radius=1, min_distance=0.05, log=False, verbose=1)
-train_idxs, val_idxs, test_idxs = provider.get_split_indices(outer_idx=5)
-# train_get = provider.get
-# val_get = provider.get
-# test_get = provider.get
-train_get = provider.get_train_split
-val_get = provider.get_validation_split
-test_get = provider.get_test_split
-# bsl = 1000
-print("Train", sort.evaluate_model_sort(train_idxs, train_get, m, batch_size_limit=bsl))
-print("Val", sort.evaluate_model_sort(val_idxs, val_get, m, batch_size_limit=bsl))
-print("Test", sort.evaluate_model_sort(test_idxs, test_get, m, batch_size_limit=bsl))
+m = sort_experiment(provider, model, epochs=100)
 
 # splits = provider.get_split(("wl1", "float32"), dict(batch_size_limit=500))
 # provider.get_test_split(outer_idx=5)[1]

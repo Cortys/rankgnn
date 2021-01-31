@@ -72,16 +72,18 @@ class UtilityPreferenceBatcher(batcher.Batcher, metaclass=ABCMeta):
   def __init__(
     self, in_meta=None, out_meta=None,
     mode="train_neighbors", neighbor_radius=1, min_distance=0,
-    pivot_partitions=None,
+    sample_ratio=1, seed=1337, pivot_partitions=None,
     **config):
     super().__init__(**config)
     self.mode = mode
     self.neighbor_radius = neighbor_radius
     self.min_distance = min_distance
+    self.sample_ratio = sample_ratio
+    self.seed = seed
     self.pivot_partitions = pivot_partitions
 
   def preprocess(self, elements):
-    if self.mode == "train_neighbors":
+    if self.mode == "train_neighbors" or self.mode == "train_random":
       assert is_pair(elements), "Utilities are required during training."
       objects, us = elements
       sort_idx = np.argsort(us)
@@ -94,30 +96,46 @@ class UtilityPreferenceBatcher(batcher.Batcher, metaclass=ABCMeta):
       raise AssertionError(f"Unknown mode '{self.mode}'.")
 
   def __iterate_train_neighbors(self, elements):
-    if self.mode == "train_neighbors":
-      objects, us, sort_idx = elements
-      olen = objects.size
-      u_max = np.NINF
-      prev_parts = collections.deque(maxlen=self.neighbor_radius)
-      dist = self.min_distance
-      curr_part = []
-      i = 0
+    objects, us, sort_idx = elements
+    olen = objects.size
+    u_max = np.NINF
+    prev_parts = collections.deque(maxlen=self.neighbor_radius)
+    dist = self.min_distance
+    curr_part = []
+    i = 0
 
-      while i < olen:
-        idx = sort_idx[i]
-        u = us[idx]
+    while i < olen:
+      idx = sort_idx[i]
+      u = us[idx]
 
-        if u - u_max > dist:
-          prev_parts.append(curr_part)
-          curr_part = []
-          u_max = u
+      if u - u_max > dist:
+        prev_parts.append(curr_part)
+        curr_part = []
+        u_max = u
 
-        for prev_part in prev_parts:
-          for p_idx in prev_part:
-              yield p_idx, idx
+      for prev_part in prev_parts:
+        for p_idx in prev_part:
+            yield p_idx, idx
 
-        curr_part.append(idx)
-        i += 1
+      curr_part.append(idx)
+      i += 1
+
+  def __iterate_train_random(self, elements, seed=None):
+    objects, us, sort_idx = elements
+    olen = objects.size
+    if seed is None:
+      seed = self.seed + olen
+    pair_count = (olen * (olen - 1)) // 2
+    sample_size = int(self.sample_ratio * pair_count)
+    rng = np.random.default_rng(seed)
+
+    sample = rng.choice(pair_count, sample_size, replace=False)
+    sample_b = (np.sqrt(sample * 2 + 1/4) + 1/2).astype(np.int)
+    sample_a = sample - (sample_b * (sample_b - 1)) // 2
+    idx_a = sort_idx[sample_a]
+    idx_b = sort_idx[sample_b]
+
+    yield from zip(idx_a, idx_b)
 
   def __iterate_pivot_partitions(self, objects):
     partitions = self.pivot_partitions
@@ -132,6 +150,8 @@ class UtilityPreferenceBatcher(batcher.Batcher, metaclass=ABCMeta):
   def iterate(self, elements):
     if self.mode == "train_neighbors":
       yield from self.__iterate_train_neighbors(elements)
+    elif self.mode == "train_random":
+      yield from self.__iterate_train_random(elements)
     elif self.mode == "pivot_partitions":
       yield from self.__iterate_pivot_partitions(elements)
     else:

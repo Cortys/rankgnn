@@ -97,7 +97,7 @@ def sort_experiment(provider, model, **config):
   m = experiment(
     provider, model, batch_size_limit=bsl,
     mode="train_random",
-    neighbor_radius=1, sample_ratio=0.00002,
+    neighbor_radius=1, sample_ratio=2,  # ~2 comps. per graph (i.e. linear)
     min_distance=0.001, log=False, verbose=1, **config)
   train_idxs, val_idxs, test_idxs = provider.get_split_indices(outer_idx=5)
   # train_get = provider.get

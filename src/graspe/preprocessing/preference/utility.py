@@ -72,13 +72,14 @@ class UtilityPreferenceBatcher(batcher.Batcher, metaclass=ABCMeta):
   def __init__(
     self, in_meta=None, out_meta=None,
     mode="train_neighbors", neighbor_radius=1, min_distance=0,
-    sample_ratio=1, seed=1337, pivot_partitions=None,
+    sample_ratio=1, linear_samping=True, seed=1337, pivot_partitions=None,
     **config):
     super().__init__(**config)
     self.mode = mode
     self.neighbor_radius = neighbor_radius
     self.min_distance = min_distance
     self.sample_ratio = sample_ratio
+    self.linear_sampling = linear_samping
     self.seed = seed
     self.pivot_partitions = pivot_partitions
 
@@ -120,13 +121,13 @@ class UtilityPreferenceBatcher(batcher.Batcher, metaclass=ABCMeta):
       curr_part.append(idx)
       i += 1
 
-  def __iterate_train_random(self, elements, seed=None):
+  def __iterate_train_random(self, elements):
     objects, us, sort_idx = elements
     olen = objects.size
-    if seed is None:
-      seed = self.seed + olen
+    seed = self.seed + olen
     pair_count = (olen * (olen - 1)) // 2
-    sample_size = int(self.sample_ratio * pair_count)
+    sample_base = olen if self.linear_sampling else pair_count
+    sample_size = min(int(self.sample_ratio * sample_base), pair_count)
     rng = np.random.default_rng(seed)
 
     sample = rng.choice(pair_count, sample_size, replace=False)

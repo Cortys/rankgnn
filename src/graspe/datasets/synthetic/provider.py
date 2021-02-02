@@ -22,7 +22,7 @@ class SyntheticDatasetLoader(loader.DatasetLoader):
   def compute_stratify_labels(self, elements): pass
 
   def load_dataset(self, only_meta=True):
-    elements = utils.unwrap_method(self.generator)()
+    elements = self.generator()
     in_meta, out_meta = self.compute_meta(elements)
 
     return dict(
@@ -59,7 +59,7 @@ class PresplitSyntheticDatasetProvider(
 
   def generate(self, id=None):
     if self._generated_data is None:
-      self._generated_data = utils.unwrap_method(self.generator)()
+      self._generated_data = self.generator()
 
     if id is not None:
       return self._generated_data[id]

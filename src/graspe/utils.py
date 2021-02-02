@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import inspect
 import pickle
+from pathlib import Path
 
 def tolerant(f=None, only_named=True, ignore_varkwargs=False):
   if f is None:
@@ -291,6 +292,10 @@ cache_formats = dict(
   json=cache_format(
     fy.partial(json.load, cls=NumpyDecoder),
     fy.partial(json.dump, cls=NumpyEncoder),
+    type="text"),
+  pretty_json=cache_format(
+    fy.partial(json.load, cls=NumpyDecoder),
+    fy.partial(json.dump, indent="\t", cls=NumpyEncoder),
     type="text")
 )
 
@@ -329,15 +334,32 @@ def cache(f, file, format="pickle"):
 
   return res
 
-def cached_method(dir_name, suffix="", format="pickle"):
+def cached_method(dir_name=None, suffix="", format="pickle"):
   def cache_annotator(m):
     @fy.wraps(m)
     def cached_m(self, *args, **kwargs):
       su = suffix(*args, **kwargs) if callable(suffix) else suffix
       fm = format(*args, **kwargs) if callable(format) else format
 
-      dir = make_dir(self.data_dir / dir_name)
+      dir = make_dir(
+        self.data_dir if dir_name is None
+        else self.data_dir / dir_name)
       cache_file = dir / f"{self.name}{su}.{fm}"
       return cache(lambda: m(self, *args, **kwargs), cache_file, fm)
     return cached_m
   return cache_annotator
+
+class memoize:
+  def __init__(self, f):
+    self.f = f
+    self.lut = {}
+
+  def __call__(self, *args):
+    key = tuple(args)
+
+    if key in self.lut:
+      return self.lut[key]
+
+    res = self.f(*args)
+    self.lut[key] = res
+    return res

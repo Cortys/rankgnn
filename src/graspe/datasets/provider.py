@@ -308,15 +308,19 @@ class CachingDatasetProvider(DatasetProvider):
         del ds_meta["elements"]
         if "stratify_labels" in ds:
           del ds_meta["stratify_labels"]
-        utils.cache_write(meta_cache_file, ds_meta, "json")
+        utils.cache_write(meta_cache_file, ds_meta, "pretty_json")
     elif not meta_cache_file.exists():
-      utils.cache_write(meta_cache_file, ds, "json")
+      utils.cache_write(meta_cache_file, ds, "pretty_json")
 
     return ds
 
   @utils.cached_method("processed", suffix="_splits", format="json")
   def _make_splits(self):
     return super()._make_splits()
+
+  @utils.cached_method(suffix="_stats", format="pretty_json")
+  def stats(self):
+    return super().stats()
 
   def _preprocess(
     self, pre: preproc.Preprocessor, ds_get, indices, train_indices,
@@ -326,22 +330,33 @@ class CachingDatasetProvider(DatasetProvider):
       fy.map(str, index_id))
     preprocessed_cache = pre.preprocessed_cacheable and self.preprocessed_cache
     preprocessed_dir = self.data_dir / pre.preprocessed_name
+    orthogonal_preprocess = pre.orthogonal_preprocess
+    preprocessed_dirs = [self.data_dir / d for d in pre.preprocessed_names]
     if preprocessed_cache:
-      utils.make_dir(preprocessed_dir)
+      if orthogonal_preprocess:
+        for d in preprocessed_dirs:
+          utils.make_dir(d)
+      else:
+        utils.make_dir(preprocessed_dir)
     preprocessed_format = pre.preprocessed_format or "pickle"
 
     def preproc():
       f = ds_get
       if indices is not None and not pre.slice_after_preprocess:
         f = lambda: pre.slice(ds_get(), indices, train_indices)
-        preprocess_file = preprocessed_dir / \
-            f"{self.name}{ds_suffix}{idx_suffix}.{preprocessed_format}"
+        pre_fname = f"{self.name}{ds_suffix}{idx_suffix}.{preprocessed_format}"
       else:
-        preprocess_file = preprocessed_dir / \
-            f"{self.name}{ds_suffix}.{preprocessed_format}"
+        pre_fname = f"{self.name}{ds_suffix}.{preprocessed_format}"
 
       if preprocessed_cache:
-        ds = utils.cache(lambda: pre.preprocess(f()), preprocess_file)
+        if orthogonal_preprocess:
+          f = utils.memoize(f)
+          ds = tuple(
+            utils.cache(lambda: pre.preprocess(f()[i], only=i), d / pre_fname)
+            for i, d in enumerate(preprocessed_dirs))
+        else:
+          preprocess_file = preprocessed_dir / pre_fname
+          ds = utils.cache(lambda: pre.preprocess(f()), preprocess_file)
       else:
         ds = pre.preprocess(f())
 

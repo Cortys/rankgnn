@@ -6,6 +6,13 @@ import graspe.preprocessing.transformer as transformer
 import graspe.preprocessing.encoder as encoder
 import graspe.preprocessing.batcher as batcher
 
+def add_io_prefixes(names, suffix=""):
+  if names is None or len(names) == 0:
+    return ()
+  elif len(names) == 2:
+    return ("in_" + names[0] + suffix, "out_" + names[1] + suffix)
+  raise AssertionError("Unsupported names list.")
+
 class Preprocessor:
   # Most efficient preprocessing allowed by default:
   slice_after_preprocess = True
@@ -39,6 +46,7 @@ class Preprocessor:
     self.in_args = fy.merge(self.in_config, in_meta)
 
     in_enc_cls = tolerant_method(self.in_encoder_gen)
+    orthogonal_preprocess = False
 
     if out_meta is None:
       self.encoder = in_enc_cls(**self.in_args)
@@ -46,17 +54,24 @@ class Preprocessor:
       self.has_out = False
     else:
       self.out_args = fy.merge(self.out_config, out_meta)
+      self.has_out = True
       if self.out_encoder_gen is None:
         self.encoder = in_enc_cls(self.in_args, self.out_args, **config)
       else:
         in_enc = in_enc_cls(**self.in_args)
         out_enc = tolerant_method(self.out_encoder_gen)(**self.out_args)
         self.encoder = transformer.tuple(in_enc, out_enc)
-        self.has_out = True
+        orthogonal_preprocess = True
+
+    self.orthogonal_preprocess = orthogonal_preprocess
 
   @property
   def preprocessed_name(self):
     return self.encoder.name
+
+  @property
+  def preprocessed_names(self):
+    return add_io_prefixes(getattr(self.encoder, "names", None))
 
   @property
   def finalized_name(self):
@@ -64,7 +79,21 @@ class Preprocessor:
       return self.encoder.name + "_sliced"
     raise Exception("This preprocessor has no post-encoding processing stage.")
 
-  def preprocess(self, elements):
+  @property
+  def finalized_names(self):
+    if self.slice_after_preprocess:
+      return add_io_prefixes(getattr(self.encoder, "names", None), "_sliced")
+    raise Exception("This preprocessor has no post-encoding processing stage.")
+
+  def preprocess(self, elements, only=None):
+    if only is not None:
+      assert self.orthogonal_preprocess, "Orthogonality required."
+      if only == "in":
+        only = 0
+      elif only == "out":
+        only = 1
+      return self.encoder.transformers[only].transform(elements)
+
     return self.encoder.transform(elements)
 
   def slice(self, elements, indices, train_indices=None):
@@ -132,6 +161,10 @@ class BatchingPreprocessor(Preprocessor):
   @property
   def finalized_name(self):
     return self.batcher.name
+
+  @property
+  def finalized_names(self):
+    return add_io_prefixes(getattr(self.batcher, "names", None))
 
   def finalize(self, elements):
     if self.reconfigurable_finalization:

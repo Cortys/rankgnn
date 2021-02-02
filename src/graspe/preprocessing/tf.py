@@ -119,6 +119,10 @@ class TFPreprocessor(preprocessor.BatchingPreprocessor):
       out_enc, self.out_args,
       batcher.lazy_batching)
 
+  @property
+  def finalized_names(self):
+    return ()  # Explicitly forbids orthogonal in/out batch caching.
+
   def finalize(self, elements):
     if self.reconfigurable_finalization:
       return lambda **config: self.__finalize_with_batcher(

@@ -1,5 +1,6 @@
 import numpy as np
 from typing import get_type_hints
+from sklearn.model_selection import train_test_split, StratifiedKFold, KFold
 
 def make_graph_batch(encoded_graphs, ref_keys, masking_fns=None, meta_fns={}):
   X_batch_size = 0
@@ -69,3 +70,30 @@ def make_graph_batch(encoded_graphs, ref_keys, masking_fns=None, meta_fns={}):
     **masking_meta,
     **metadata_batch
   }
+
+def make_holdout_split(holdout, objects, strat_labels=None):
+  if holdout == 0:
+    return objects, [], strat_labels
+  else:
+    train_split, test_split = train_test_split(
+      np.arange(objects.size),
+      test_size=holdout,
+      stratify=strat_labels)
+
+    if strat_labels is not None:
+      strat_labels = strat_labels[train_split]
+
+    return objects[train_split], objects[test_split], strat_labels
+
+def make_kfold_splits(n, objects, strat_labels=None):
+  if strat_labels is None:
+    kfold = KFold(n_splits=n, shuffle=True)
+  else:
+    kfold = StratifiedKFold(n_splits=n, shuffle=True)
+
+  for train_split, test_split in kfold.split(objects, strat_labels):
+    yield (
+      objects[train_split],
+      objects[test_split],
+      strat_labels[train_split] if strat_labels is not None else None
+    )

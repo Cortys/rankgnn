@@ -4,6 +4,7 @@ import requests
 import funcy as fy
 import numpy as np
 
+import graspe.utils as utils
 import graspe.datasets.loader as loader
 import graspe.datasets.provider as provider
 import graspe.datasets.tu.utils as tu_utils
@@ -57,8 +58,7 @@ class TUDatasetLoader(loader.DatasetLoader):
         graphs.append(g)
         out_targets.append(target)
 
-    graphs_a = np.empty(len(graphs), dtype="O")
-    graphs_a[:] = graphs
+    graphs_a = utils.obj_array(graphs)
     out_targets = np.array(out_targets)
 
     return dict(
@@ -66,6 +66,17 @@ class TUDatasetLoader(loader.DatasetLoader):
       in_meta=in_meta, out_meta=self.config,
       size=len(out_targets),
       stratify_labels=out_targets if self.stratifiable else None)
+
+  def stats(self, loaded_dataset):
+    gs, ys = loaded_dataset["elements"]
+
+    return dict(
+      graphs=utils.graphs_stats(gs),
+      targets=utils.statistics(ys),
+      size=loaded_dataset["size"],
+      in_meta=loaded_dataset["in_meta"],
+      out_meta=loaded_dataset["out_meta"]
+    )
 
 class TUDatasetProvider(provider.CachingDatasetProvider):
   root_dir = provider.CACHE_ROOT / "tu"

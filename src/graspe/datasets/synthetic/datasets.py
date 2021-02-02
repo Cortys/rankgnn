@@ -5,8 +5,11 @@ import numpy as np
 import networkx as nx
 import funcy as fy
 
-from graspe.utils import cart, local_seed, unzip
-from graspe.datasets.synthetic.provider import synthetic_graph_embed_dataset
+from graspe.utils import obj_array, cart, local_seed, unzip
+import graspe.preprocessing.utils as preproc
+from graspe.datasets.synthetic.provider import \
+  synthetic_graph_embed_dataset,\
+  presplit_synthetic_graph_embed_dataset
 
 @synthetic_graph_embed_dataset(type="binary")
 def twothree_dataset():
@@ -184,3 +187,26 @@ def triangle_count_dataset(seed=1337):
       ys += bin_ys
 
     return graphs, np.array(ys)
+
+@presplit_synthetic_graph_embed_dataset(extends=triangle_count_dataset)
+def size_extrapolation_triangle_count_dataset(ds, seed=1337):
+  graphs, ys = ds
+
+  train_ds = []
+  test_ds = []
+
+  for g, y in zip(graphs, ys):
+    if g.order() < 60:
+      train_ds.append((g, y))
+    else:
+      test_ds.append((g, y))
+
+  train_ds = obj_array(train_ds)
+
+  with local_seed(seed):
+    train_ds, val_ds, _ = preproc.make_holdout_split(0.1, train_ds)
+
+    return dict(
+      train=unzip(train_ds),
+      val=unzip(val_ds),
+      test=unzip(test_ds))

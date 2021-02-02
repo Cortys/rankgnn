@@ -41,8 +41,11 @@ def tolerant(f=None, only_named=True, ignore_varkwargs=False):
 
   return wrapper
 
+def unwrap_method(f):
+  return getattr(f, "__func__", f)
+
 def tolerant_method(f):
-  return tolerant(getattr(f, "__func__", f))
+  return tolerant(unwrap_method(f))
 
 
 fully_tolerant = tolerant(only_named=False)
@@ -83,6 +86,12 @@ class NumpyDecoder(json.JSONDecoder):
         obj[key] = self.object_hook(obj[key])
 
     return obj
+
+def obj_array(objects):
+  a = np.empty(len(objects), dtype='O')
+  a[:] = objects
+
+  return a
 
 def statistics(vals, mask_invalid=False):
   if mask_invalid:

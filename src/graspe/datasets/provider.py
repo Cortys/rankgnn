@@ -1,9 +1,9 @@
 import funcy as fy
 import numpy as np
 from pathlib import Path
-from sklearn.model_selection import train_test_split, StratifiedKFold, KFold
 
 import graspe.utils as utils
+import graspe.preprocessing.utils as preproc_utils
 import graspe.preprocessing.preprocessor as preproc
 import graspe.datasets.loader as loader
 
@@ -19,7 +19,8 @@ class DatasetProvider:
   def __init__(
     self, loader: ldr.DatasetLoader,
     outer_k=10, inner_k=None,
-    holdout_size=0.1,
+    inner_holdout=0.1,
+    outer_holdout=0.1,
     stratify=True,
     name_suffix="",
     in_memory_cache=True):
@@ -28,8 +29,10 @@ class DatasetProvider:
     self.outer_k = outer_k
     assert inner_k is None or inner_k > 1
     self.inner_k = inner_k
-    assert not (outer_k is None or inner_k is None) or holdout_size is not None
-    self.holdout_size = holdout_size
+    assert outer_k is not None or outer_holdout is not None
+    assert inner_k is not None or inner_holdout is not None
+    self.outer_holdout = outer_holdout
+    self.inner_holdout = inner_holdout
     self.stratify = stratify and loader.stratifiable
     self.name_suffix = name_suffix
     self.in_memory_cache = in_memory_cache
@@ -87,42 +90,17 @@ class DatasetProvider:
   def unload_dataset(self):
     self._dataset = None
 
-  def __make_holdout_split(self, idxs, strat_labels=None):
-    if self.holdout_size == 0:
-      return idxs, [], strat_labels
-    else:
-      train_split, test_split = train_test_split(
-        np.arange(idxs.size),
-        test_size=self.holdout_size,
-        stratify=strat_labels)
-
-      if strat_labels is not None:
-        strat_labels = strat_labels[train_split]
-
-      return idxs[train_split], idxs[test_split], strat_labels
-
-  def __make_kfold_splits(self, n, idxs, strat_labels=None):
-    if self.stratify:
-      kfold = StratifiedKFold(n_splits=n, shuffle=True)
-    else:
-      kfold = KFold(n_splits=n, shuffle=True)
-
-    for train_split, test_split in kfold.split(idxs, strat_labels):
-      yield (
-        idxs[train_split], idxs[test_split],
-        strat_labels[train_split] if strat_labels is not None else None)
-
   def __make_model_selection_splits(self, train_o, strat_o=None):
     if self.inner_k is None:
-      train_i, val_i, _ = self.__make_holdout_split(
-        train_o, strat_o)
+      train_i, val_i, _ = preproc_utils.make_holdout_split(
+        self.inner_holdout, train_o, strat_o)
       return [dict(
         train=train_i,
         validation=val_i)]
     else:
       return [
         dict(train=train_i, validation=val_i)
-        for train_i, val_i, _ in self.__make_kfold_splits(
+        for train_i, val_i, _ in preproc_utils.make_kfold_splits(
           self.inner_k, train_o, strat_o)]
 
   def _make_splits(self):
@@ -130,8 +108,8 @@ class DatasetProvider:
     strat_labels = self.stratify_labels
 
     if self.outer_k is None:
-      train_o, test_o, strat_o = self.__make_holdout_split(
-        all_idxs, strat_labels)
+      train_o, test_o, strat_o = preproc_utils.make_holdout_split(
+        self.outer_holdout, all_idxs, strat_labels)
       return [dict(
         test=test_o,
         model_selection=self.__make_model_selection_splits(train_o, strat_o))]
@@ -140,7 +118,7 @@ class DatasetProvider:
         dict(
           test=test_o,
           model_selection=self.__make_model_selection_splits(train_o, strat_o))
-        for train_o, test_o, strat_o in self.__make_kfold_splits(
+        for train_o, test_o, strat_o in preproc_utils.make_kfold_splits(
           self.outer_k, all_idxs, strat_labels)]
 
   def _get_preprocessor(self, enc, config, reconfigurable_finalization=False):

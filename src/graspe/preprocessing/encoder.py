@@ -1,5 +1,6 @@
 import numpy as np
 
+import graspe.utils as utils
 import graspe.preprocessing.transformer as transformer
 
 class Encoder(transformer.Transformer):
@@ -31,17 +32,13 @@ class ObjectEncoder(Encoder):
     if isinstance(elements, np.ndarray):
       return elements
 
-    a = np.empty(len(elements), dtype='O')
-    a[:] = elements
-    return a
+    return utils.obj_array(elements)
 
   def finalize(self, aggregator):
     if isinstance(aggregator, np.ndarray):
       return aggregator
 
-    a = np.empty(len(aggregator), dtype='O')
-    a[:] = aggregator
-    return a
+    return utils.obj_array(aggregator)
 
 class TupleEncoder(transformer.TupleTransformer, Encoder):
   def __init__(self, *encoders, size=2):

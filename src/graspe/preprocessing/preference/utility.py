@@ -116,7 +116,7 @@ class UtilityPreferenceBatcher(batcher.Batcher, metaclass=ABCMeta):
 
       for prev_part in prev_parts:
         for p_idx in prev_part:
-            yield p_idx, idx
+          yield p_idx, idx
 
       curr_part.append(idx)
       i += 1

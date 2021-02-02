@@ -47,7 +47,7 @@ def experiment(provider, model, log=True, verbose=2, epochs=1000, **config):
     cmp_layer_units=[edim],
     activation="sigmoid", inner_activation="relu",
     # att_conv_activation="relu",
-    pooling="softmax")
+    pooling="sum")
   print("Instanciated model.", enc)
   if provider.dataset_size < 10:
     ds_train = provider.get(enc)
@@ -61,7 +61,7 @@ def experiment(provider, model, log=True, verbose=2, epochs=1000, **config):
 
   print("Loaded encoded datasets.")
   provider.unload_dataset()
-  opt = keras.optimizers.Adam(0.0005)
+  opt = keras.optimizers.Adam(0.0001)
 
   if out_enc == "multiclass":
     loss = "categorical_crossentropy"
@@ -96,9 +96,9 @@ def sort_experiment(provider, model, **config):
   bsl = 10000
   m = experiment(
     provider, model, batch_size_limit=bsl,
-    mode="train_random",
-    neighbor_radius=1, sample_ratio=2,  # ~2 comps. per graph (i.e. linear)
-    min_distance=0.001, log=False, verbose=1, **config)
+    # mode="train_random",
+    neighbor_radius=1, sample_ratio=2,  # => ~4 comps. per graph (i.e. linear)
+    min_distance=0.001, log=False, verbose=2, **config)
   train_idxs, val_idxs, test_idxs = provider.get_split_indices(outer_idx=5)
   # train_get = provider.get
   # val_get = provider.get
@@ -114,15 +114,19 @@ def sort_experiment(provider, model, **config):
 
 
 # provider = syn.triangle_classification_dataset()
-# provider = syn.triangle_count_dataset()
-provider = tu.ZINC(in_memory_cache=False)
+provider = syn.triangle_count_dataset()
+# provider = syn.size_extrapolation_triangle_count_dataset(cache=False)
+# provider = tu.ZINC(in_memory_cache=False)
 # provider = tu.Mutag()
 # provider = tu.Reddit5K()
 
 # provider.dataset
 # model = gnn.CmpGIN
 model = gnn.DirectRankGIN
-m = sort_experiment(provider, model, epochs=100)
+
+
+# provider.stats()
+m = sort_experiment(provider, model, epochs=5000)
 
 # splits = provider.get_split(("wl1", "float32"), dict(batch_size_limit=500))
 # provider.get_test_split(outer_idx=5)[1]

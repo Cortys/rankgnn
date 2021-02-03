@@ -6,6 +6,7 @@ import numpy as np
 import collections
 from datetime import datetime
 
+import graspe.datasets.provider as prov
 import graspe.datasets.synthetic.datasets as syn
 import graspe.datasets.tu.datasets as tu
 import graspe.preprocessing.utils as enc_utils
@@ -26,7 +27,7 @@ def time_str():
 def experiment(provider, model, log=True, verbose=2, epochs=1000, **config):
   enc = fy.first(provider.find_compatible_encoding(model))
   in_enc, out_enc = enc
-  dim = 128
+  dim = 64
   depth = 5
   fc_layer_args = None
   if "pref" in in_enc:
@@ -55,8 +56,7 @@ def experiment(provider, model, log=True, verbose=2, epochs=1000, **config):
     #  targets = provider.dataset[1]
   else:
     ds_train, ds_val, ds_test = provider.get_split(
-      enc, config=config,
-      outer_idx=5)
+      enc, config=config)
     #  targets = provider.get_test_split(outer_idx=5)[1]
 
   print("Loaded encoded datasets.")
@@ -89,23 +89,27 @@ def experiment(provider, model, log=True, verbose=2, epochs=1000, **config):
     epochs=epochs, verbose=verbose,
     callbacks=[tb] if log else [])
 
+  print("Completed training.")
+  m.evaluate(ds_test)
   print(np.around(m.predict(ds_test), 2))
   return m
 
 def sort_experiment(provider, model, **config):
-  bsl = 10000
+  bsl = 40000
   m = experiment(
     provider, model, batch_size_limit=bsl,
-    # mode="train_random",
-    neighbor_radius=1, sample_ratio=2,  # => ~4 comps. per graph (i.e. linear)
+    mode="train_random",
+    neighbor_radius=2, sample_ratio=20,  # => ~4 comps. per graph (i.e. linear)
     min_distance=0.001, log=False, verbose=2, **config)
-  train_idxs, val_idxs, test_idxs = provider.get_split_indices(outer_idx=5)
-  # train_get = provider.get
-  # val_get = provider.get
-  # test_get = provider.get
-  train_get = provider.get_train_split
-  val_get = provider.get_validation_split
-  test_get = provider.get_test_split
+  train_idxs, val_idxs, test_idxs = provider.get_split_indices()
+  if isinstance(provider, prov.PresplitDatasetProvider):
+    train_get = provider.get_train_split
+    val_get = provider.get_validation_split
+    test_get = provider.get_test_split
+  else:
+    train_get = provider.get
+    val_get = provider.get
+    test_get = provider.get
   bsl = 1000
   print("Train", sort.evaluate_model_sort(train_idxs, train_get, m, batch_size_limit=bsl))
   print("Val", sort.evaluate_model_sort(val_idxs, val_get, m, batch_size_limit=bsl))
@@ -114,20 +118,22 @@ def sort_experiment(provider, model, **config):
 
 
 # provider = syn.triangle_classification_dataset()
-# provider = syn.triangle_count_dataset()
+provider = syn.triangle_count_dataset(default_split="count_extrapolation")
 # provider = syn.size_extrapolation_triangle_count_dataset(cache=False)
-provider = tu.ZINC(in_memory_cache=False)
+# provider = tu.ZINC(in_memory_cache=False)
 # provider = tu.Mutag()
 # provider = tu.Reddit5K()
 
 # provider.dataset
 # model = gnn.CmpGIN
-model = gnn.DirectRankGIN
+model = gnn.DirectRankWL2GNN
+# model = gnn.WL2GNN
 
 
 # provider.stats()
 m = sort_experiment(provider, model, epochs=5000)
-
+# train,val,test=provider.get_split_indices()
+# provider.get(indices=test)
 # splits = provider.get_split(("wl1", "float32"), dict(batch_size_limit=500))
 # provider.get_test_split(outer_idx=5)[1]
 # fy.last(splits[2])

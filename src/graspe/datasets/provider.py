@@ -15,12 +15,14 @@ class DatasetProvider:
   loader: ldr.DatasetLoader = None
   _dataset = None
   _splits = None
+  _named_splits = None
 
   def __init__(
     self, loader: ldr.DatasetLoader,
     outer_k=10, inner_k=None,
     inner_holdout=0.1,
     outer_holdout=0.1,
+    default_split=0,
     stratify=True,
     name_suffix="",
     in_memory_cache=True):
@@ -33,6 +35,7 @@ class DatasetProvider:
     assert inner_k is not None or inner_holdout is not None
     self.outer_holdout = outer_holdout
     self.inner_holdout = inner_holdout
+    self.default_split = default_split
     self.stratify = stratify and loader.stratifiable
     self.name_suffix = name_suffix
     self.in_memory_cache = in_memory_cache
@@ -74,6 +77,13 @@ class DatasetProvider:
       self._splits = self._make_splits()
 
     return self._splits
+
+  @property
+  def named_splits(self):
+    if self._named_splits is None:
+      self._named_splits = self._get_named_splits()
+
+    return self._named_splits
 
   def _load_dataset(self, only_meta=False, id=None):
     return self.loader.load_dataset(only_meta)
@@ -121,6 +131,12 @@ class DatasetProvider:
         for train_o, test_o, strat_o in preproc_utils.make_kfold_splits(
           self.outer_k, all_idxs, strat_labels)]
 
+  def _make_named_splits(self):
+    return dict()
+
+  def _get_named_splits(self):
+    return self._make_named_splits()
+
   def _get_preprocessor(self, enc, config, reconfigurable_finalization=False):
     return preproc.find_preprocessor(self.dataset_type, enc)(
       self.in_meta, self.out_meta, config, reconfigurable_finalization)
@@ -155,27 +171,41 @@ class DatasetProvider:
       preprocessor, lambda: self.dataset,
       indices, train_indices, index_id, finalize)
 
-  def get_split_indices(self, outer_idx=None, inner_idx=None):
-    outer_idx = outer_idx or 0
+  def get_split_indices(self, outer_idx=None, inner_idx=None, relative=False):
+    outer_idx = outer_idx or self.default_split
     inner_idx = inner_idx or 0
-    assert (outer_idx == 0 or outer_idx < self.outer_k) \
-        and (inner_idx == 0 or inner_idx < self.inner_k)
-    split = self.splits[outer_idx]
+
+    if isinstance(outer_idx, str):
+      split = self.named_splits[outer_idx]
+    else:
+      assert (outer_idx == 0 or outer_idx < self.outer_k) \
+          and (inner_idx == 0 or inner_idx < self.inner_k)
+      split = self.splits[outer_idx]
+
     inner_fold = split["model_selection"][inner_idx]
     test_idxs = split["test"]
     train_idxs = inner_fold["train"]
     val_idxs = inner_fold["validation"]
 
+    if relative:
+      return (
+        np.arange(train_idxs.size),
+        np.arange(val_idxs.size),
+        np.arange(test_idxs.size))
+
     return train_idxs, val_idxs, test_idxs
 
-  def get_train_split_indices(self, outer_idx=None, inner_idx=None):
-    return self.get_split_indices(outer_idx, inner_idx)[0]
+  def get_train_split_indices(
+    self, outer_idx=None, inner_idx=None, relative=False):
+    return self.get_split_indices(outer_idx, inner_idx, relative)[0]
 
-  def get_validation_split_indices(self, outer_idx=None, inner_idx=None):
-    return self.get_split_indices(outer_idx, inner_idx)[1]
+  def get_validation_split_indices(
+    self, outer_idx=None, inner_idx=None, relative=False):
+    return self.get_split_indices(outer_idx, inner_idx, relative)[1]
 
-  def get_test_split_indices(self, outer_idx=None, inner_idx=None):
-    return self.get_split_indices(outer_idx, inner_idx)[2]
+  def get_test_split_indices(
+    self, outer_idx=None, inner_idx=None, relative=False):
+    return self.get_split_indices(outer_idx, inner_idx, relative)[2]
 
   def get_split(
     self, enc=None, config=None, outer_idx=None, inner_idx=None,
@@ -183,7 +213,7 @@ class DatasetProvider:
     indices=None):
     assert indices is None or only is not None, \
         "Index subsets can only be provided if a single split is requested."
-    outer_idx = outer_idx or 0
+    outer_idx = outer_idx or self.default_split
     inner_idx = inner_idx or 0
     train_idxs, val_idxs, test_idxs = self.get_split_indices(
       outer_idx, inner_idx)
@@ -317,6 +347,10 @@ class CachingDatasetProvider(DatasetProvider):
   @utils.cached_method("processed", suffix="_splits", format="json")
   def _make_splits(self):
     return super()._make_splits()
+
+  @utils.cached_method("processed", suffix="_named_splits", format="json")
+  def _get_named_splits(self):
+    return super()._get_named_splits()
 
   @utils.cached_method(suffix="_stats", format="pretty_json")
   def stats(self):
@@ -512,16 +546,23 @@ class PresplitDatasetProvider(DatasetProvider):
   def get(self, *args, **kwargs):
     raise Exception("Presplit datasets cannot be resliced.")
 
-  def get_train_split_indices(self, outer_idx=None, inner_idx=None):
+  def get_train_split_indices(
+    self, outer_idx=None, inner_idx=None, relative=True):
+    assert relative, "Absolute indexing is not possible in presplit datasets."
     return np.arange(self.train_dataset_size)
 
-  def get_validation_split_indices(self, outer_idx=None, inner_idx=None):
+  def get_validation_split_indices(
+    self, outer_idx=None, inner_idx=None, relative=True):
+    assert relative, "Absolute indexing is not possible in presplit datasets."
     return np.arange(self.validation_dataset_size)
 
-  def get_test_split_indices(self, outer_idx=None, inner_idx=None):
+  def get_test_split_indices(
+    self, outer_idx=None, inner_idx=None, relative=True):
+    assert relative, "Absolute indexing is not possible in presplit datasets."
     return np.arange(self.test_dataset_size)
 
-  def get_split_indices(self, outer_idx=None, inner_idx=None):
+  def get_split_indices(self, outer_idx=None, inner_idx=None, relative=True):
+    assert relative, "Absolute indexing is not possible in presplit datasets."
     return (
       self.get_train_split_indices(),
       self.get_validation_split_indices(),

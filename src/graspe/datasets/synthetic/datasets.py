@@ -188,25 +188,46 @@ def triangle_count_dataset(seed=1337):
 
     return graphs, np.array(ys)
 
-@presplit_synthetic_graph_embed_dataset(extends=triangle_count_dataset)
-def size_extrapolation_triangle_count_dataset(ds, seed=1337):
+@triangle_count_dataset.register_splitter("size_extrapolation")
+def size_extrapolated_triangle_count_split(ds, seed=1337):
   graphs, ys = ds
 
-  train_ds = []
-  test_ds = []
+  train_idxs = []
+  test_idxs = []
 
-  for g, y in zip(graphs, ys):
-    if g.order() < 60:
-      train_ds.append((g, y))
+  for i, g in enumerate(graphs):
+    if g.order() < 40:
+      train_idxs.append(i)
     else:
-      test_ds.append((g, y))
-
-  train_ds = obj_array(train_ds)
+      test_idxs.append(i)
 
   with local_seed(seed):
-    train_ds, val_ds, _ = preproc.make_holdout_split(0.1, train_ds)
+    train_idxs, val_idxs, _ = preproc.make_holdout_split(
+      0.1, np.array(train_idxs))
 
-    return dict(
-      train=unzip(train_ds),
-      val=unzip(val_ds),
-      test=unzip(test_ds))
+    test_idxs = np.array(test_idxs)
+    np.random.shuffle(test_idxs)
+
+    return train_idxs, val_idxs, test_idxs
+
+@triangle_count_dataset.register_splitter("count_extrapolation")
+def count_extrapolated_triangle_count_split(ds, seed=1337):
+  graphs, ys = ds
+
+  train_idxs = []
+  test_idxs = []
+
+  for i, y in enumerate(ys):
+    if y < 3:
+      train_idxs.append(i)
+    else:
+      test_idxs.append(i)
+
+  with local_seed(seed):
+    train_idxs, val_idxs, _ = preproc.make_holdout_split(
+      0.1, np.array(train_idxs))
+
+    test_idxs = np.array(test_idxs)
+    np.random.shuffle(test_idxs)
+
+    return train_idxs, val_idxs, test_idxs

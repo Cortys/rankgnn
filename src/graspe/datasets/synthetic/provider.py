@@ -38,7 +38,34 @@ class SyntheticDatasetProvider(provider.CachingDatasetProvider):
   def __init__(self, generator, config, *args, **kwargs):
     loader = self.loaderClass(generator, config)
     self.name = generator.__name__
+
     super().__init__(loader, *args, **kwargs)
+
+  @classmethod
+  def register_splitter(cls, name, f=None):
+    if f is None:
+      return lambda f: cls.register_splitter(name, f)
+
+    @fy.wraps(f)
+    def splitter(ds):
+      train, val, test = f(ds)
+      return dict(
+        model_selection=[dict(
+          train=np.array(train),
+          validation=np.array(val))],
+        test=np.array(test))
+
+    if not hasattr(cls, "splitters"):
+      cls.splitters = dict()
+
+    cls.splitters[name] = splitter
+    return f
+
+  def _make_named_splits(self):
+    ds = self.dataset
+    return {
+      name: splitter(ds)
+      for name, splitter in self.splitters.items()}
 
 class PresplitSyntheticDatasetProvider(
   provider.CachingDatasetProvider, provider.PresplitDatasetProvider):
@@ -115,18 +142,27 @@ def synthetic_dataset_decorator(cls):
 
     if extends is not None:
       g = f
-      h = getattr(extends, "__original__", extends)
-      config = fy.merge(config, getattr(extends, "__config__", {}))
+      h = utils.unwrap_method(getattr(extends, "generator", extends))
+      config = fy.merge(config, getattr(extends, "config", {}))
       f = fy.compose(g, h)
       f.__name__ = g.__name__
 
     pc = {"outer_k", "inner_k", "outer_holdout", "inner_holdout", "stratify"}
-    provider_config = fy.select_keys(lambda k: k in pc, config)
-    loader_config = fy.select_keys(lambda k: k not in pc, config)
-    res = fy.func_partial(cls, f, loader_config, **provider_config)
-    res.__original__ = f
-    res.__config__ = config
-    return res
+    c = config
+    provider_config = fy.select_keys(lambda k: k in pc, c)
+    loader_config = fy.select_keys(lambda k: k not in pc, c)
+
+    class SyntheticProvider(cls):
+      generator = f
+      config = c
+
+      def __init__(self, *args, **kwargs):
+        super().__init__(
+          f, loader_config, *args, **fy.merge(provider_config, kwargs))
+
+    SyntheticProvider.__name__ = f.__name__
+
+    return SyntheticProvider
 
   return dataset_decorator
 

@@ -3,6 +3,7 @@ import numpy as np
 from pathlib import Path
 
 import graspe.utils as utils
+import graspe.stats as stats
 import graspe.preprocessing.utils as preproc_utils
 import graspe.preprocessing.preprocessor as preproc
 import graspe.datasets.loader as loader
@@ -70,6 +71,10 @@ class DatasetProvider:
   @property
   def dataset_type(self):
     return self.loader.dataset_type
+
+  @property
+  def stats(self):
+    return self._get_stats()
 
   @property
   def splits(self):
@@ -283,8 +288,28 @@ class DatasetProvider:
       enc, config, outer_idx, inner_idx, "test", finalize,
       reconfigurable_finalization, indices)
 
-  def stats(self):
-    return self.loader.stats(self._cache_dataset(only_meta=False))
+  def _compute_stats(self):
+    t = self.dataset_type
+    named_splits = self.named_splits
+
+    if named_splits is None or len(named_splits) == 0:
+      named_splits = None
+
+    res = stats.find_stat_computer(t)(
+      self.dataset, named_splits)
+
+    if isinstance(t, tuple):
+      return {"in": res[0], "out": res[1]}
+    else:
+      return {"in": res}
+
+  def _get_stats(self):
+    return dict(
+      type=self.dataset_type,
+      **self._compute_stats(),
+      size=self.dataset_size,
+      in_meta=self.in_meta,
+      out_meta=self.out_meta)
 
   def find_compatible_encoding(self, input_encodings, output_encodings=None):
     if output_encodings is None:
@@ -353,8 +378,8 @@ class CachingDatasetProvider(DatasetProvider):
     return super()._get_named_splits()
 
   @utils.cached_method(suffix="_stats", format="pretty_json")
-  def stats(self):
-    return super().stats()
+  def _get_stats(self):
+    return super()._get_stats()
 
   def _preprocess(
     self, pre: preproc.Preprocessor, ds_get, indices, train_indices,
@@ -601,3 +626,12 @@ class PresplitDatasetProvider(DatasetProvider):
 
     assert only is None, f"Invalid only-selector: {only}."
     return res
+
+  def _compute_stats(self):
+    computer = stats.find_stat_computer(self.dataset_type)
+    ds = self.dataset
+
+    return dict(
+      train=computer(ds["train"]),
+      val=computer(ds["val"]) if ds["val"] else None,
+      test=computer(ds["test"]) if ds["test"] else None)

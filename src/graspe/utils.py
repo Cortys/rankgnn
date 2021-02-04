@@ -5,12 +5,10 @@ import itertools
 import contextlib
 import numpy as np
 import funcy as fy
-from collections import Sized
 import matplotlib.pyplot as plt
 import networkx as nx
 import inspect
 import pickle
-from pathlib import Path
 
 def tolerant(f=None, only_named=True, ignore_varkwargs=False):
   if f is None:
@@ -94,30 +92,6 @@ def obj_array(objects):
 
   return a
 
-def statistics(vals, mask_invalid=False):
-  if mask_invalid:
-    vals_masked = np.ma.masked_invalid(vals)
-    return {
-      "mean": np.mean(vals_masked),
-      "std": np.std(vals_masked),
-      "median": np.median(vals_masked),
-      "min": np.min(vals),
-      "max": np.max(vals),
-      "max_masked": np.max(vals_masked),
-      "min_masked": np.min(vals_masked),
-      "count": len(vals),
-      "count_masked": vals_masked.count()
-    }
-  else:
-    return {
-      "mean": np.mean(vals),
-      "std": np.std(vals),
-      "median": np.median(vals),
-      "min": np.min(vals),
-      "max": np.max(vals),
-      "count": len(vals) if isinstance(vals, Sized) else 1
-    }
-
 @contextlib.contextmanager
 def local_seed(seed):
   state = np.random.get_state()
@@ -194,27 +168,6 @@ def draw_graph(
       node_color=node_color, vmin=0, vmax=1, cmap=cmap)
 
   plt.show()
-
-def graphs_stats(graphs):
-  node_counts = []
-  edge_counts = []
-  radii = []
-  degrees = []
-
-  for g in graphs:
-    node_counts.append(g.order())
-    edge_counts.append(g.size())
-    degrees += [d for n, d in g.degree()]
-    try:
-      radii.append(nx.algorithms.distance_measures.radius(g))
-    except Exception:
-      radii.append(np.inf)
-
-  return dict(
-    node_counts=statistics(node_counts),
-    edge_counts=statistics(edge_counts),
-    node_degrees=statistics(degrees),
-    radii=statistics(radii, mask_invalid=True))
 
 def graph_feature_dims(g):
   dim_node_features = 0
@@ -340,11 +293,12 @@ def cached_method(dir_name=None, suffix="", format="pickle"):
     def cached_m(self, *args, **kwargs):
       su = suffix(*args, **kwargs) if callable(suffix) else suffix
       fm = format(*args, **kwargs) if callable(format) else format
+      ext = "json" if fm == "pretty_json" else fm
 
       dir = make_dir(
         self.data_dir if dir_name is None
         else self.data_dir / dir_name)
-      cache_file = dir / f"{self.name}{su}.{fm}"
+      cache_file = dir / f"{self.name}{su}.{ext}"
       return cache(lambda: m(self, *args, **kwargs), cache_file, fm)
     return cached_m
   return cache_annotator

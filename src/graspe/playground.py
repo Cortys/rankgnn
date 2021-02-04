@@ -118,9 +118,9 @@ def sort_experiment(provider, model, **config):
 
 
 # provider = syn.triangle_classification_dataset()
-provider = syn.triangle_count_dataset(default_split="count_extrapolation")
+# provider = syn.triangle_count_dataset(default_split="count_extrapolation")
 # provider = syn.size_extrapolation_triangle_count_dataset(cache=False)
-# provider = tu.ZINC(in_memory_cache=False)
+provider = tu.ZINC(in_memory_cache=False)
 # provider = tu.Mutag()
 # provider = tu.Reddit5K()
 
@@ -129,9 +129,9 @@ provider = syn.triangle_count_dataset(default_split="count_extrapolation")
 model = gnn.DirectRankWL2GNN
 # model = gnn.WL2GNN
 
-
+provider.stats
 # provider.stats()
-m = sort_experiment(provider, model, epochs=5000)
+# m = sort_experiment(provider, model, epochs=5000)
 # train,val,test=provider.get_split_indices()
 # provider.get(indices=test)
 # splits = provider.get_split(("wl1", "float32"), dict(batch_size_limit=500))

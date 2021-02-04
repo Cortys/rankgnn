@@ -62,6 +62,9 @@ class SyntheticDatasetProvider(provider.CachingDatasetProvider):
     return f
 
   def _make_named_splits(self):
+    if not hasattr(self, "splitters"):
+      return dict()
+
     ds = self.dataset
     return {
       name: splitter(ds)
@@ -114,17 +117,6 @@ class SyntheticGraphEmbedDatasetLoader(SyntheticDatasetLoader):
 
   def compute_stratify_labels(self, elements):
     return np.array(elements[1])
-
-  def stats(self, loaded_dataset):
-    gs, ys = loaded_dataset["elements"]
-
-    return dict(
-      graphs=utils.graphs_stats(gs),
-      targets=utils.statistics(ys),
-      size=loaded_dataset["size"],
-      in_meta=loaded_dataset["in_meta"],
-      out_meta=loaded_dataset["out_meta"]
-    )
 
 class SyntheticGraphEmbedDatasetProvider(SyntheticDatasetProvider):
   loaderClass = SyntheticGraphEmbedDatasetLoader

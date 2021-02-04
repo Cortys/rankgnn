@@ -67,17 +67,6 @@ class TUDatasetLoader(loader.DatasetLoader):
       size=len(out_targets),
       stratify_labels=out_targets if self.stratifiable else None)
 
-  def stats(self, loaded_dataset):
-    gs, ys = loaded_dataset["elements"]
-
-    return dict(
-      graphs=utils.graphs_stats(gs),
-      targets=utils.statistics(ys),
-      size=loaded_dataset["size"],
-      in_meta=loaded_dataset["in_meta"],
-      out_meta=loaded_dataset["out_meta"]
-    )
-
 class TUDatasetProvider(provider.CachingDatasetProvider):
   root_dir = provider.CACHE_ROOT / "tu"
 

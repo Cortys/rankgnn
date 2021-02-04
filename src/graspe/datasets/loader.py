@@ -14,8 +14,6 @@ class DatasetLoader(ABC):
   @abstractmethod
   def load_dataset(self, only_meta: bool): pass
 
-  def stats(self, loaded_dataset=None): return
-
 class PresplitDatasetLoader(DatasetLoader):
   def __init__(
     self,
@@ -50,9 +48,3 @@ class PresplitDatasetLoader(DatasetLoader):
       res["test"] = self.test.load_dataset(only_meta)
 
     return res
-
-  def stats(self, loaded_dataset=None):
-    return dict(
-      train=self.train.stats(loaded_dataset["train"]),
-      val=self.val.stats(loaded_dataset["val"]) if self.val else None,
-      test=self.test.stats(loaded_dataset["test"]) if self.test else None)

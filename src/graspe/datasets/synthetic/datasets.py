@@ -5,11 +5,10 @@ import numpy as np
 import networkx as nx
 import funcy as fy
 
-from graspe.utils import obj_array, cart, local_seed, unzip
+from graspe.utils import cart, local_seed, unzip
 import graspe.preprocessing.utils as preproc
 from graspe.datasets.synthetic.provider import \
-  synthetic_graph_embed_dataset,\
-  presplit_synthetic_graph_embed_dataset
+  synthetic_graph_embed_dataset
 
 @synthetic_graph_embed_dataset(type="binary")
 def twothree_dataset():

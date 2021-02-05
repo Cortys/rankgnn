@@ -9,6 +9,7 @@ from datetime import datetime
 import graspe.datasets.provider as prov
 import graspe.datasets.synthetic.datasets as syn
 import graspe.datasets.tu.datasets as tu
+import graspe.datasets.ogb.datasets as ogb
 import graspe.preprocessing.utils as enc_utils
 import graspe.preprocessing.graph.wl1 as wl1_enc
 import graspe.preprocessing.transformer as transformer
@@ -120,18 +121,16 @@ def sort_experiment(provider, model, **config):
 # provider = syn.triangle_classification_dataset()
 # provider = syn.triangle_count_dataset(default_split="count_extrapolation")
 # provider = syn.size_extrapolation_triangle_count_dataset(cache=False)
-provider = tu.ZINC(in_memory_cache=False)
-# provider = tu.Mutag()
-# provider = tu.Reddit5K()
+# provider = tu.ZINC(in_memory_cache=False)
+provider = ogb.Mollipo()
 
-# provider.dataset
 # model = gnn.CmpGIN
-model = gnn.DirectRankWL2GNN
+model = gnn.DirectRankGIN
+# model = gnn.DirectRankWL2GNN
 # model = gnn.WL2GNN
+# model = gnn.GIN
 
-provider.stats
-# provider.stats()
-# m = sort_experiment(provider, model, epochs=5000)
+m = sort_experiment(provider, model, epochs=5000)
 # train,val,test=provider.get_split_indices()
 # provider.get(indices=test)
 # splits = provider.get_split(("wl1", "float32"), dict(batch_size_limit=500))

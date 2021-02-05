@@ -3,9 +3,10 @@ from pathlib import Path
 
 RAW_ROOT = Path("../raw/")
 
-def is_stratifiable(out_type, out_meta):
-  return type == "binary" \
-      or (type == "integer" and out_meta.get("max", None) is not None)
+def is_stratifiable(out_type, out_meta=None):
+  return type == "binary" or (
+    type == "integer" and out_meta is not None
+    and out_meta.get("max", None) is not None)
 
 class DatasetLoader(ABC):
   dataset_type = None

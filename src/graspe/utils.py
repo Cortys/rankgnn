@@ -87,7 +87,7 @@ class NumpyDecoder(json.JSONDecoder):
     return obj
 
 def obj_array(objects):
-  a = np.empty(len(objects), dtype='O')
+  a = np.empty(len(objects), dtype="O")
   a[:] = objects
 
   return a
@@ -187,29 +187,33 @@ def graph_feature_dims(g):
 
   return dim_node_features, dim_edge_features
 
-def graphs_meta(graphs):
+def graphs_meta(graphs, labels=True):
   assert len(graphs) > 0
-  n_labels = set()
-  e_labels = set()
+  if labels:
+    n_labels = set()
+    e_labels = set()
 
-  for g in graphs:
-    for n, d in g.nodes(data=True):
-      if "label" in d:
-        n_labels.add(d["label"])
+    for g in graphs:
+      for n, d in g.nodes(data=True):
+        if "label" in d:
+          n_labels.add(d["label"])
 
-    for u, v, d in g.edges(data=True):
-      if "label" in d:
-        e_labels.add(d["label"])
+      for u, v, d in g.edges(data=True):
+        if "label" in d:
+          e_labels.add(d["label"])
 
-  n_nl = (
-    max(n_labels) if n_labels != set() else 0)
-  if n_nl != 0 and min(n_labels) == 0:
-    n_nl += 1
+    n_nl = (
+      max(n_labels) if n_labels != set() else 0)
+    if n_nl != 0 and min(n_labels) == 0:
+      n_nl += 1
 
-  n_el = (
-    max(e_labels) if e_labels != set() else 0)
-  if n_el != 0 and min(e_labels) == 0:
-    n_el += 1
+    n_el = (
+      max(e_labels) if e_labels != set() else 0)
+    if n_el != 0 and min(e_labels) == 0:
+      n_el += 1
+  else:
+    n_nl = 0
+    n_el = 0
 
   d_nf, d_ef = graph_feature_dims(graphs[0])
 

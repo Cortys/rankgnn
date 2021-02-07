@@ -612,14 +612,14 @@ class PresplitDatasetProvider(DatasetProvider):
     if self.loader.val and (only is None or only == "val"):
       val_ds = self._preprocess(
         pre, lambda: self.validation_dataset,
-        indices, None, None, finalize, ("val",))
+        indices, False, None, finalize, ("val",))
       if only == "val":
         return val_ds
       res += (val_ds,)
     if self.loader.test and (only is None or only == "test"):
       test_ds = self._preprocess(
         pre, lambda: self.test_dataset,
-        indices, None, None, finalize, ("test",))
+        indices, False, None, finalize, ("test",))
       if only == "test":
         return test_ds
       res += (test_ds,)

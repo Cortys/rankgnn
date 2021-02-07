@@ -76,7 +76,7 @@ def evaluate_model_sort(indices, provider_get, model, **config):
 
   if "pref" in model.in_enc:
     predicted_ordering = model_sort(indices, provider_get, model, **config)
-  elif model.out_enc == "float32":
+  elif model.out_enc in {"float32", "float"}:
     data = provider_get((model.in_enc, model.out_enc), indices=indices)
     predicted_rankings = model.predict(data)
     predicted_ordering = indices[np.argsort(predicted_rankings)]

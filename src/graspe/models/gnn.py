@@ -16,8 +16,6 @@ warnings.filterwarnings(
   "Converting sparse IndexedSlices*",
   UserWarning)
 
-global_target_encs = ["float32", "vec32", "binary", "multiclass"]
-
 @cm.model_inputs
 def inputs(in_enc, in_meta):
   return tf_enc.make_inputs(in_enc, in_meta)
@@ -74,7 +72,7 @@ GIN = ck.create_model("GIN", [
   cm.with_layers(Dense, prefix="fc"),
   finalize],
   input_encodings=["wl1"],
-  output_encodings=global_target_encs)
+  output_encodings=tf_enc.output_encodings)
 
 WL2GNN = ck.create_model("WL2GNN", [
   inputs,
@@ -82,7 +80,7 @@ WL2GNN = ck.create_model("WL2GNN", [
   cm.with_layers(Dense, prefix="fc"),
   finalize],
   input_encodings=["wl2"],
-  output_encodings=global_target_encs)
+  output_encodings=tf_enc.output_encodings)
 
 def createDirectRankGNN(name, gnnLayer, enc):
   return ck.create_model(name, [

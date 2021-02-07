@@ -18,6 +18,7 @@ import graspe.preprocessing.preprocessor as preprocessor
 import graspe.preprocessing.tf as tf_enc
 import graspe.utils as utils
 import graspe.models.gnn as gnn
+import graspe.models.svm as svm
 import graspe.models.sort as sort
 
 # -%% codecell
@@ -39,6 +40,8 @@ def experiment(provider, model, log=True, verbose=2, epochs=1000, **config):
   elif out_enc == "float32":
     edim = 1
     fc_layer_args = {-1: dict(activation=None)}
+  else:
+    edim = None
   m = model(
     in_enc=in_enc, out_enc=out_enc,
     in_meta=provider.in_meta, out_meta=provider.out_meta,
@@ -49,7 +52,8 @@ def experiment(provider, model, log=True, verbose=2, epochs=1000, **config):
     cmp_layer_units=[edim],
     activation="sigmoid", inner_activation="relu",
     # att_conv_activation="relu",
-    pooling="sum")
+    pooling="sum",
+    C=0.1)
   print("Instanciated model.", enc)
   if provider.dataset_size < 10:
     ds_train = provider.get(enc)
@@ -62,33 +66,38 @@ def experiment(provider, model, log=True, verbose=2, epochs=1000, **config):
 
   print("Loaded encoded datasets.")
   provider.unload_dataset()
-  opt = keras.optimizers.Adam(0.0001)
 
-  if out_enc == "multiclass":
-    loss = "categorical_crossentropy"
-    metrics = ["categorical_accuracy"]
-  elif out_enc == "binary":
-    loss = "binary_crossentropy"
-    metrics = ["binary_accuracy"]
+  if isinstance(m, keras.Model):
+    opt = keras.optimizers.Adam(0.0001)
+
+    if out_enc == "multiclass":
+      loss = "categorical_crossentropy"
+      metrics = ["categorical_accuracy"]
+    elif out_enc == "binary":
+      loss = "binary_crossentropy"
+      metrics = ["binary_accuracy"]
+    else:
+      loss = "mean_squared_error"
+      metrics = ["mean_absolute_error"]
+
+    m.compile(
+      optimizer=opt, loss=loss, metrics=metrics)
+
+    t = time_str()
+    log_dir = f"../logs/{t}_{m.name}_{provider.name}/"
+    tb = keras.callbacks.TensorBoard(
+      log_dir=log_dir,
+      histogram_freq=50,
+      profile_batch="100,115")
+    print("Compiled model.")
+
+    m.fit(
+      ds_train.cache(),
+      validation_data=ds_val.cache(),
+      epochs=epochs, verbose=verbose,
+      callbacks=[tb] if log else [])
   else:
-    loss = "mean_squared_error"
-    metrics = ["mean_absolute_error"]
-
-  m.compile(
-    optimizer=opt, loss=loss, metrics=metrics)
-
-  t = time_str()
-  log_dir = f"../logs/{t}_{m.name}_{provider.name}/"
-  tb = keras.callbacks.TensorBoard(
-    log_dir=log_dir,
-    histogram_freq=50,
-    profile_batch="100,115")
-  print("Compiled model.")
-  m.fit(
-    ds_train.cache(),
-    validation_data=ds_val.cache(),
-    epochs=epochs, verbose=verbose,
-    callbacks=[tb] if log else [])
+    m.fit(ds_train, validation_data=ds_val)
 
   print("Completed training.")
   m.evaluate(ds_test)
@@ -102,15 +111,11 @@ def sort_experiment(provider, model, **config):
     mode="train_random",
     neighbor_radius=2, sample_ratio=20,  # => ~4 comps. per graph (i.e. linear)
     min_distance=0.001, log=False, verbose=2, **config)
-  train_idxs, val_idxs, test_idxs = provider.get_split_indices()
-  if isinstance(provider, prov.PresplitDatasetProvider):
-    train_get = provider.get_train_split
-    val_get = provider.get_validation_split
-    test_get = provider.get_test_split
-  else:
-    train_get = provider.get
-    val_get = provider.get
-    test_get = provider.get
+  train_idxs, val_idxs, test_idxs = provider.get_split_indices(relative=True)
+  train_get = provider.get_train_split
+  val_get = provider.get_validation_split
+  test_get = provider.get_test_split
+
   bsl = 1000
   print("Train", sort.evaluate_model_sort(train_idxs, train_get, m, batch_size_limit=bsl))
   print("Val", sort.evaluate_model_sort(val_idxs, val_get, m, batch_size_limit=bsl))
@@ -125,12 +130,13 @@ def sort_experiment(provider, model, **config):
 provider = ogb.Mollipo()
 
 # model = gnn.CmpGIN
-model = gnn.DirectRankGIN
+# model = gnn.DirectRankGIN
 # model = gnn.DirectRankWL2GNN
 # model = gnn.WL2GNN
 # model = gnn.GIN
+model = svm.WL_st
 
-m = sort_experiment(provider, model, epochs=5000)
+m = sort_experiment(provider, model, epochs=5000, T=3)
 # train,val,test=provider.get_split_indices()
 # provider.get(indices=test)
 # splits = provider.get_split(("wl1", "float32"), dict(batch_size_limit=500))

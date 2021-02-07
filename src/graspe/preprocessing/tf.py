@@ -187,6 +187,9 @@ def create_graph_preprocessors(name, encoder, batcher, pref_util_batcher):
     io_batcher=True)
 
 
+input_encodings = ["wl1", "wl2", "wl1_pref", "wl2_pref"]
+output_encodings = ["float32", "vec32", "binary", "multiclass"]
+
 create_graph_preprocessors(
   "wl1", wl1_enc.WL1Encoder, wl1_enc.WL1Batcher,
   wl1_enc.WL1UtilityPreferenceBatcher)

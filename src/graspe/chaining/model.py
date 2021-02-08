@@ -35,36 +35,74 @@ def model_step(f=None, macro=False):
 
   return pipeline.pipeline_step(wrapper, macro)
 
-def validate_model_encs(input_encodings, output_encodings):
-  def validator(input, in_enc=None, out_enc=None):
+def process_model_encs(input_encodings, output_encodings, model_family):
+  def processor(kwargs):
+    in_enc = kwargs.get("in_enc", None)
+    out_enc = kwargs.get("out_enc", None)
+    family = kwargs.get("family", None)
+
+    if "enc" in kwargs:
+      enc = kwargs["enc"]
+      del kwargs["enc"]
+      if in_enc is None:
+        in_enc = enc[0]
+      if out_enc is None:
+        out_enc = enc[1]
+      if family is None and len(enc) > 2:
+        family = enc[2]
+
     if in_enc is not None:
       assert in_enc in input_encodings,\
         f"'{in_enc}' inputs are not supported."
+    else:
+      assert len(input_encodings) == 1,\
+        "Unknown model input encoding."
+      in_enc = fy.first(input_encodings)
+
     if out_enc is not None:
       assert out_enc in output_encodings,\
         f"'{out_enc}' outputs are not supported."
+    else:
+      assert len(output_encodings) == 1,\
+        "Unknown model output encoding."
+      out_enc = fy.first(output_encodings)
 
-    return input
-  return validator
+    if family is not None and model_family is not None:
+      assert family == model_family,\
+        f"This model is not from the family '{family}'."
+    else:
+      family = model_family
 
-def add_enc(model, in_enc=None, out_enc=None):
+    kwargs["in_enc"] = in_enc
+    kwargs["out_enc"] = out_enc
+    kwargs["family"] = family
+    kwargs["enc"] = (in_enc, out_enc, family)
+    return kwargs
+  return processor
+
+def add_enc(model, in_enc=None, out_enc=None, family=None):
   try:
     if in_enc is not None:
       model.in_enc = in_enc
     if out_enc is not None:
       model.out_enc = out_enc
+    if family is not None:
+      model.family = family
+    model.enc = (in_enc, out_enc, family)
   finally:
     return model
 
 def create_model(
   as_model, name, steps, extend_at=None,
   input_encodings=[], output_encodings=[],
+  model_family=None,
   **kwargs):
   input_encodings = set(input_encodings)
   output_encodings = set(output_encodings)
   modelFactory = pipeline.create_pipeline(
-    [validate_model_encs(input_encodings, output_encodings),
-     *steps, as_model(name), add_enc],
+    [*steps, as_model(name), add_enc],
+    arg_transformer=process_model_encs(
+      input_encodings, output_encodings, model_family),
     **kwargs)
 
   def extend(
@@ -90,6 +128,7 @@ def create_model(
   modelFactory.name = name
   modelFactory.input_encodings = input_encodings
   modelFactory.output_encodings = output_encodings
+  modelFactory.family = model_family
 
   return modelFactory
 

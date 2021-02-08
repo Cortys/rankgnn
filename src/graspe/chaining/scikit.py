@@ -10,25 +10,29 @@ class History:
 class SkModel:
   model_ctr = None
   defaults = {}
+  family = "scikit"
 
-  def __init__(self, in_enc=None, out_enc=None, **config):
-    self._validate_enc(in_enc, out_enc)
-    self.in_enc = in_enc
-    self.out_enc = out_enc
+  def __init__(self, **config):
+    self.config = self._validate_enc(config)
+    self.in_enc = self.config.get("in_enc", None)
+    self.out_enc = self.config.get("out_enc", None)
     self.config = config
     model, metric = utils.tolerant_method(self.model_factory)(
-      in_enc=in_enc, out_enc=out_enc,
       **fy.merge(self.defaults, config))
     self.model = model
     self.metric_name = metric
 
   @property
+  def enc(self):
+    return (self.in_enc, self.out_enc, self.family)
+
+  @property
   def metrics_names(self):
     return [self.metric_name]
 
-  def _validate_enc(self, in_enc, out_enc):
-    model.validate_model_encs(
-      self.input_encodings, self.output_encodings)(None, in_enc, out_enc)
+  def _validate_enc(self, config):
+    return model.process_model_encs(
+      self.input_encodings, self.output_encodings, self.family)(config)
 
   def fit(
     self, training_data, validation_data=None, **kwargs):

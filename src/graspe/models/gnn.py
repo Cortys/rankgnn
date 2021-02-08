@@ -1,10 +1,7 @@
-import tensorflow as tf
-from tensorflow import keras
-
-import graspe.utils as utils
 import graspe.chaining.model as cm
 import graspe.chaining.keras as ck
 import graspe.preprocessing.tf as tf_enc
+from graspe.models.nn import inputs, finalize, Dense
 import graspe.layers.wl1 as wl1
 import graspe.layers.wl2 as wl2
 import graspe.layers.pooling as pl
@@ -15,10 +12,6 @@ warnings.filterwarnings(
   "ignore",
   "Converting sparse IndexedSlices*",
   UserWarning)
-
-@cm.model_inputs
-def inputs(in_enc, in_meta):
-  return tf_enc.make_inputs(in_enc, in_meta)
 
 @cm.model_step
 def pool(input, pooling="mean"):
@@ -49,22 +42,12 @@ def graph_embed(_, conv_layer, pooling=None):
   else:
     return [conv_layers, pool]
 
-@cm.model_step
-def finalize(input, out_enc, out_meta=None, squeeze_output=False):
-  if squeeze_output or out_enc == "binary" or out_enc == "float32":
-    return tf.squeeze(input, -1)
-  else:
-    return input
-
 def index_selector(idx):
   @cm.model_step
   def selector(input):
     return input[idx]
   return selector
 
-
-Dense = utils.tolerant(keras.layers.Dense, ignore_varkwargs=True)
-Activation = utils.tolerant(keras.layers.Activation, ignore_varkwargs=True)
 
 GIN = ck.create_model("GIN", [
   inputs,

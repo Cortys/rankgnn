@@ -11,12 +11,13 @@ import graspe.datasets.synthetic.datasets as syn
 import graspe.datasets.tu.datasets as tu
 import graspe.datasets.ogb.datasets as ogb
 import graspe.preprocessing.utils as enc_utils
-import graspe.preprocessing.graph.wl1 as wl1_enc
+import graspe.preprocessing.graph.graph2vec as g2v
 import graspe.preprocessing.transformer as transformer
 import graspe.preprocessing.encoder as encoder
 import graspe.preprocessing.preprocessor as preprocessor
 import graspe.preprocessing.tf as tf_enc
 import graspe.utils as utils
+import graspe.models.nn as nn
 import graspe.models.gnn as gnn
 import graspe.models.svm as svm
 import graspe.models.sort as sort
@@ -26,24 +27,40 @@ import graspe.models.sort as sort
 def time_str():
   return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
-def experiment(provider, model, log=True, verbose=2, epochs=1000, **config):
-  enc = fy.first(provider.find_compatible_encoding(model))
-  in_enc, out_enc = enc
+def experiment(
+  provider, model, log=True, verbose=2, epochs=1000,
+  prefer_in_enc=None, prefer_out_enc=None, **config):
+  encs = list(provider.find_compatible_encodings(model))
+  if len(encs) > 1:
+    filtered_encs = list(fy.filter(
+      lambda enc: (
+        (prefer_in_enc is None or enc[0] == prefer_in_enc)
+        and (prefer_out_enc is None or enc[1] == prefer_out_enc)
+      ), encs))
+    if len(filtered_encs) > 0:
+      encs = filtered_encs
+
+  enc = encs[0]
+  in_enc = enc[0]
+  out_enc = enc[1]
   dim = 64
   depth = 5
   fc_layer_args = None
+
+  print(f"Evaluating model with enc {enc}...")
+
   if "pref" in in_enc:
     edim = dim
     fc_layer_args = {-1: dict(activation=None)}
   elif out_enc == "binary":
     edim = 1
-  elif out_enc == "float32":
+  elif out_enc == "float":
     edim = 1
     fc_layer_args = {-1: dict(activation=None)}
   else:
     edim = None
   m = model(
-    in_enc=in_enc, out_enc=out_enc,
+    enc=enc,
     in_meta=provider.in_meta, out_meta=provider.out_meta,
     conv_layer_units=[dim] * depth,
     att_conv_layer_units=[dim] * depth,
@@ -53,7 +70,7 @@ def experiment(provider, model, log=True, verbose=2, epochs=1000, **config):
     activation="sigmoid", inner_activation="relu",
     # att_conv_activation="relu",
     pooling="sum",
-    C=0.1)
+    kernel="rbf", C=0.1)
   print("Instanciated model.", enc)
   if provider.dataset_size < 10:
     ds_train = provider.get(enc)
@@ -124,28 +141,20 @@ def sort_experiment(provider, model, **config):
 
 
 # provider = syn.triangle_classification_dataset()
+# provider = syn.triangle_count_dataset()
 # provider = syn.triangle_count_dataset(default_split="count_extrapolation")
-# provider = syn.size_extrapolation_triangle_count_dataset(cache=False)
 # provider = tu.ZINC(in_memory_cache=False)
-provider = ogb.Mollipo()
+# provider = ogb.Mollipo()
+provider = ogb.Molesol()
 
 # model = gnn.CmpGIN
 # model = gnn.DirectRankGIN
 # model = gnn.DirectRankWL2GNN
 # model = gnn.WL2GNN
 # model = gnn.GIN
-model = svm.WL_st
+# model = svm.KernelSVM
+model = svm.SVM
+# model = nn.MLP
+# provider.get(("graph2vec", "float"))
 
-m = sort_experiment(provider, model, epochs=5000, T=3)
-# train,val,test=provider.get_split_indices()
-# provider.get(indices=test)
-# splits = provider.get_split(("wl1", "float32"), dict(batch_size_limit=500))
-# provider.get_test_split(outer_idx=5)[1]
-# fy.last(splits[2])
-# fy.first(splits[2])
-# provider.unload_dataset()
-# provider.dataset
-# utils.draw_graph(provider.train_dataset[0][10000])
-# list(provider.get_test_split(("wl1", "float32"), dict(batch_size_limit=10)))[0]
-# provider.dataset
-# fy.first(provider.get(("wl1_pref", "binary"), config=dict(batch_size_limit=3)))
+m = sort_experiment(provider, model, epochs=1000, T=5, prefer_in_enc="wlst")

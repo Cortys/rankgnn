@@ -76,12 +76,12 @@ def evaluate_model_sort(indices, provider_get, model, **config):
 
   if "pref" in model.in_enc:
     predicted_ordering = model_sort(indices, provider_get, model, **config)
-  elif model.out_enc in {"float32", "float"}:
-    data = provider_get((model.in_enc, model.out_enc), indices=indices)
+  elif model.out_enc == "float":
+    data = provider_get(model.enc, indices=indices)
     predicted_rankings = model.predict(data)
     predicted_ordering = indices[np.argsort(predicted_rankings)]
   else:
-    raise Exception(f"Unsupported enc ({model.in_enc}, {model.out_enc}).")
+    raise Exception(f"Unsupported enc {model.enc}.")
 
   print("Computing tau...")
   return rank_metric.bucket_sorted_tau(

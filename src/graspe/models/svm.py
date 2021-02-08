@@ -2,7 +2,7 @@ import sklearn.svm as svm
 
 import graspe.utils as utils
 import graspe.chaining.scikit as cs
-import graspe.preprocessing.kernel as kernel
+import graspe.preprocessing.scikit as sk_enc
 
 def svm_model(in_enc, out_enc, **config):
   if out_enc == "class":
@@ -15,14 +15,13 @@ def svm_model(in_enc, out_enc, **config):
   return utils.tolerant(cls, ignore_varkwargs=True)(**config), metric
 
 
-WL_st = cs.create_model(
-  "WL_st", svm_model,
-  kernel="precomputed",
-  input_encodings=["gram_wlst"],
-  output_encodings=kernel.output_encodings)
+SVM = cs.create_model(
+  "SVM", svm_model,
+  input_encodings=sk_enc.vector_input_encodings,
+  output_encodings=sk_enc.svm_output_encodings)
 
-WL_sp = cs.create_model(
-  "WL_sp", svm_model,
+KernelSVM = cs.create_model(
+  "KernelSVM", svm_model,
   kernel="precomputed",
-  input_encodings=["gram_wlsp"],
-  output_encodings=kernel.output_encodings)
+  input_encodings=sk_enc.kernel_input_encodings,
+  output_encodings=sk_enc.svm_output_encodings)

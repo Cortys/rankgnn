@@ -311,19 +311,25 @@ class DatasetProvider:
       in_meta=self.in_meta,
       out_meta=self.out_meta)
 
-  def find_compatible_encoding(self, input_encodings, output_encodings=None):
-    if output_encodings is None:
-      if hasattr(input_encodings, "input_encodings") \
+  def find_compatible_encodings(
+    self, input_encodings, output_encodings=None, family=None):
+    if family is None and hasattr(input_encodings, "family"):
+      family = input_encodings.family
+
+    if output_encodings is None \
+        and hasattr(input_encodings, "input_encodings") \
         and hasattr(input_encodings, "output_encodings"):
-        output_encodings = input_encodings.output_encodings
-        input_encodings = input_encodings.input_encodings
+      output_encodings = input_encodings.output_encodings
+      input_encodings = input_encodings.input_encodings
 
     compatible_encodings = preproc.find_encodings(self.dataset_type)
     in_set = set(input_encodings)
     out_set = set(output_encodings)
 
     return fy.filter(
-      lambda enc: enc[0] in in_set and enc[1] in out_set,
+      lambda enc: (
+        enc[0] in in_set and enc[1] in out_set
+        and (family is None or len(enc) < 3 or enc[2] == family)),
       compatible_encodings)
 
 

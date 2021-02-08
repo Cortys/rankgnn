@@ -15,4 +15,4 @@ def as_model(io, name):
     inputs=inputs, outputs=outputs, name=name)
 
 
-create_model = fy.partial(model.create_model, as_model)
+create_model = fy.partial(model.create_model, as_model, model_family="tf")

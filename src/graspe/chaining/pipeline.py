@@ -71,12 +71,15 @@ def to_executable_step(f):
 
   return tolerant(f)
 
-def create_pipeline(steps, **kwargs1):
+def create_pipeline(steps, arg_transformer=None, **kwargs1):
   executable_steps = [to_executable_step(step) for step in steps]
 
   def pipeline(input=None, **kwargs2):
     a = input
     kwargs = fy.merge(kwargs1, kwargs2)
+
+    if arg_transformer is not None:
+      kwargs = arg_transformer(kwargs)
 
     for executable_step in executable_steps:
       a = executable_step(a, **kwargs)

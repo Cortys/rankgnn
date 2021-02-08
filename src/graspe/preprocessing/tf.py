@@ -5,6 +5,7 @@ import graspe.utils as utils
 import graspe.preprocessing.preprocessor as preprocessor
 import graspe.preprocessing.graph.wl1 as wl1_enc
 import graspe.preprocessing.graph.wl2 as wl2_enc
+import graspe.preprocessing.graph.graph2vec as g2v
 import graspe.preprocessing.classification as cls_enc
 
 def wl1(meta):
@@ -44,6 +45,9 @@ def multiclass(meta):
     classes = 2
   return vec32(dict(feature_dim=classes))
 
+def graph2vec(meta):
+  return vec32(dict(feature_dim=meta.get("embedding_dim", g2v.default_dim)))
+
 def pref(enc):
   def pref_enc(meta):
     signature = enc(meta)
@@ -60,8 +64,9 @@ encodings = dict(
   wl1_pref=pref(wl1),
   wl2=wl2,
   wl2_pref=pref(wl2),
-  float32=vec32,
-  vec32=vec32,
+  graph2vec=graph2vec,
+  float=vec32,
+  vector=vec32,
   binary=vec32,
   multiclass=multiclass
 )
@@ -89,10 +94,14 @@ def make_dataset(
 def make_inputs(enc, meta={}):
   spec = encodings[enc](meta)
 
-  return {
-    k: keras.Input(
-      name=k, dtype=s.dtype, shape=tuple(s.shape.as_list()[1:]))
-    for k, s in spec.items()}
+  if isinstance(spec, dict):
+    return {
+      k: keras.Input(
+        name=k, dtype=s.dtype, shape=tuple(s.shape.as_list()[1:]))
+      for k, s in spec.items()}
+  else:
+    return keras.Input(
+      name="X", dtype=spec.dtype, shape=tuple(spec.shape.as_list()[1:]))
 
 def load_tfrecords(file):
   return tf.data.TFRecordDataset([str(file)])
@@ -109,7 +118,7 @@ class TFPreprocessor(preprocessor.BatchingPreprocessor):
 
   def __finalize_with_batcher(self, elements, batcher):
     batch_gen = batcher.batch_generator(elements)
-    in_enc, out_enc = self.enc
+    in_enc, out_enc, _ = self.enc
     if not self.has_out:
       out_enc = None
 
@@ -151,45 +160,50 @@ def create_preprocessor(
   preprocessor.register_preprocessor(type, enc, Preprocessor)
   return Preprocessor
 
-def create_graph_preprocessors(name, encoder, batcher, pref_util_batcher):
+def create_graph_preprocessors(
+  name, encoder, batcher=None, pref_util_batcher=None):
   # Regression:
   create_preprocessor(
-    ("graph", "integer"), (name, "float32"),
+    ("graph", "integer"), (name, "float", "tf"),
     encoder, batcher)
   create_preprocessor(
-    ("graph", "float"), (name, "float32"),
+    ("graph", "float"), (name, "float", "tf"),
     encoder, batcher)
   create_preprocessor(
-    ("graph", "vector"), (name, "vec32"),
+    ("graph", "vector"), (name, "vector", "tf"),
     encoder, batcher)
 
   # Classification:
   create_preprocessor(
-    ("graph", "binary"), (name, "binary"),
+    ("graph", "binary"), (name, "binary", "tf"),
     encoder, batcher)
   create_preprocessor(
-    ("graph", "binary"), (name, "multiclass"),
+    ("graph", "binary"), (name, "multiclass", "tf"),
     encoder, batcher,
     cls_enc.MulticlassEncoder)
   create_preprocessor(
-    ("graph", "integer"), (name, "multiclass"),
+    ("graph", "integer"), (name, "multiclass", "tf"),
     encoder, batcher,
     cls_enc.MulticlassEncoder)
 
   # Ranking:
-  create_preprocessor(
-    ("graph", "integer"), (f"{name}_pref", "binary"),
-    encoder, pref_util_batcher,
-    io_batcher=True)  # pref_util_batcher processes (graphs, utils) tuples
-  create_preprocessor(
-    ("graph", "float"), (f"{name}_pref", "binary"),
-    encoder, pref_util_batcher,
-    io_batcher=True)
+  if pref_util_batcher is not None:
+    create_preprocessor(
+      ("graph", "integer"), (f"{name}_pref", "binary", "tf"),
+      encoder, pref_util_batcher,
+      io_batcher=True)  # pref_util_batcher processes (graphs, utils) tuples
+    create_preprocessor(
+      ("graph", "float"), (f"{name}_pref", "binary", "tf"),
+      encoder, pref_util_batcher,
+      io_batcher=True)
 
 
-input_encodings = ["wl1", "wl2", "wl1_pref", "wl2_pref"]
-output_encodings = ["float32", "vec32", "binary", "multiclass"]
+vector_input_encodings = ["graph2vec"]
+graph_input_encodings = ["wl1", "wl2", "wl1_pref", "wl2_pref"]
+output_encodings = ["float", "vector", "binary", "multiclass"]
 
+create_graph_preprocessors(
+  "graph2vec", g2v.Graph2VecEncoder)
 create_graph_preprocessors(
   "wl1", wl1_enc.WL1Encoder, wl1_enc.WL1Batcher,
   wl1_enc.WL1UtilityPreferenceBatcher)

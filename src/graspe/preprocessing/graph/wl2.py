@@ -10,9 +10,20 @@ import graspe.preprocessing.preference.utility as pref_util
 @tolerant
 def feature_dim(
   node_feature_dim=0, node_label_count=0,
-  edge_feature_dim=0, edge_label_count=0):
+  edge_feature_dim=0, edge_label_count=0,
+  ignore_node_features=False, ignore_node_labels=False,
+  ignore_edge_features=False, ignore_edge_labels=False):
+  if ignore_node_features:
+    node_feature_dim = 0
+  if ignore_node_labels:
+    node_label_count = 0
+  if ignore_edge_features:
+    edge_feature_dim = 0
+  if ignore_edge_labels:
+    edge_label_count = 0
+
   return 3 + node_feature_dim + node_label_count \
-    + edge_feature_dim + edge_label_count
+      + edge_feature_dim + edge_label_count
 
 def eid_lookup(e_ids, i, j):
   if i > j:
@@ -23,8 +34,20 @@ def eid_lookup(e_ids, i, j):
 def encode_graph(
   g, radius=1,
   node_feature_dim=0, node_label_count=0,
-  edge_feature_dim=0, edge_label_count=0):
+  edge_feature_dim=0, edge_label_count=0,
+  ignore_node_features=False, ignore_node_labels=False,
+  ignore_edge_features=False, ignore_edge_labels=False):
   assert radius >= 1
+
+  if ignore_node_features:
+    node_feature_dim = 0
+  if ignore_node_labels:
+    node_label_count = 0
+  if ignore_edge_features:
+    edge_feature_dim = 0
+  if ignore_edge_labels:
+    edge_label_count = 0
+
   g_p = nx.power(g, radius)
   for node in g.nodes:
     g_p.add_edge(node, node)
@@ -113,19 +136,35 @@ class WL2Encoder(encoder.ObjectEncoder):
   def __init__(
     self, radius=1,
     node_feature_dim=0, node_label_count=0,
-    edge_feature_dim=0, edge_label_count=0):
+    edge_feature_dim=0, edge_label_count=0,
+    ignore_node_features=False, ignore_node_labels=False,
+    ignore_edge_features=False, ignore_edge_labels=False):
     self.radius = radius
     self.node_feature_dim = node_feature_dim
     self.node_label_count = node_label_count
     self.edge_feature_dim = edge_feature_dim
     self.edge_label_count = edge_label_count
+    self.ignore_node_features = ignore_node_features
+    self.ignore_node_labels = ignore_node_labels
+    self.ignore_edge_features = ignore_edge_features
+    self.ignore_edge_labels = ignore_edge_labels
     self.name = f"wl2_r{radius}"
+    if ignore_node_features and node_feature_dim > 0:
+      self.name += "_inf"
+    if ignore_node_labels and node_label_count > 0:
+      self.name += "_inl"
+    if ignore_edge_features and edge_feature_dim > 0:
+      self.name += "_ief"
+    if ignore_edge_labels and edge_label_count > 0:
+      self.name += "_iel"
 
   def encode_element(self, graph):
     return encode_graph(
       graph, self.radius,
       self.node_feature_dim, self.node_label_count,
-      self.edge_feature_dim, self.edge_label_count)
+      self.edge_feature_dim, self.edge_label_count,
+      self.ignore_node_features, self.ignore_node_labels,
+      self.ignore_edge_features, self.ignore_edge_labels)
 
 def make_wl2_batch(graphs):
   return enc_utils.make_graph_batch(

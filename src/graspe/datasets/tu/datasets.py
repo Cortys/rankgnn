@@ -1,3 +1,6 @@
+import numpy as np
+
+import graspe.utils as utils
 from graspe.datasets.tu.provider import tu_dataset, presplit_tu_dataset
 
 # Binary:
@@ -13,6 +16,23 @@ Reddit5K = tu_dataset("REDDIT-MULTI-5K", type="integer", min=1, max=5)
 IMDBMulti = tu_dataset("IMDB-MULTI", type="integer", min=1, max=3)
 
 # Regression:
-ZINC = presplit_tu_dataset(
+rng = np.random.default_rng(42)
+TRIANGLES = tu_dataset(
+  "TRIANGLES", type="integer",
+  default_split=(
+    rng.permutation(30000),
+    rng.permutation(5000) + 30000,
+    rng.permutation(10000) + 35000),
+  default_preprocess_config=dict(ignore_node_features=True))
+
+rng = np.random.default_rng(42)
+ZINC_full = tu_dataset(
+  "ZINC_full", type="float",
+  default_split=(
+    rng.permutation(220011),
+    rng.permutation(24445) + 225011,
+    rng.permutation(5000) + 220011))
+
+ZINC_presplit = presplit_tu_dataset(
   "ZINC", "ZINC_train", "ZINC_val", "ZINC_test",
   type="float")

@@ -80,5 +80,7 @@ class OGBDatasetProvider(provider.CachingDatasetProvider):
   def _make_named_splits(self):
     return self.loader.named_splits
 
-def ogb_dataset(name, **config):
-  return fy.func_partial(OGBDatasetProvider, name, config)
+def ogb_dataset(name, default_preprocess_config=None, **config):
+  return fy.func_partial(
+    OGBDatasetProvider, name, config,
+    default_preprocess_config=default_preprocess_config)

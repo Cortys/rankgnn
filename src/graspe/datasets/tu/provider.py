@@ -70,10 +70,23 @@ class TUDatasetLoader(loader.DatasetLoader):
 class TUDatasetProvider(provider.CachingDatasetProvider):
   root_dir = provider.CACHE_ROOT / "tu"
 
-  def __init__(self, name, config, *args, **kwargs):
+  def __init__(self, name, config, default_split=None, *args, **kwargs):
     loader = TUDatasetLoader(name, config)
     self.name = name
-    super().__init__(loader, *args, **kwargs)
+    self._tu_split = default_split
+    ds = "tu" if default_split is not None else 0
+    super().__init__(loader, *args, default_split=ds, **kwargs)
+
+  def _make_named_splits(self):
+    split = self._tu_split
+    if split is None:
+      return dict()
+
+    return dict(tu=dict(
+      model_selection=[dict(
+        train=split[0],
+        validation=split[1])],
+      test=split[2]))
 
 class PresplitTUDatasetProvider(
   provider.CachingDatasetProvider, provider.PresplitDatasetProvider):
@@ -90,10 +103,16 @@ class PresplitTUDatasetProvider(
       loader_test=loader_test,
       **kwargs)
 
-def tu_dataset(name, **config):
-  return fy.func_partial(TUDatasetProvider, name, config)
-
-def presplit_tu_dataset(name, name_train, name_val, name_test, **config):
+def tu_dataset(
+  name, default_split=None, default_preprocess_config=None, **config):
   return fy.func_partial(
-    PresplitTUDatasetProvider,
-    name, name_train, name_val, name_test, config)
+    TUDatasetProvider, name, config,
+    default_split=default_split,
+    default_preprocess_config=default_preprocess_config)
+
+def presplit_tu_dataset(
+  name, name_train, name_val, name_test,
+  default_preprocess_config=None, **config):
+  return fy.func_partial(
+    PresplitTUDatasetProvider, name, name_train, name_val, name_test, config,
+    default_preprocess_config=default_preprocess_config)

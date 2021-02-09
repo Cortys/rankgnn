@@ -148,8 +148,9 @@ class Graph2Vec:
   def __init__(
     self, wl_iterations: int = 2,
     node_attributes=None, edge_attributes=None,
-    dimensions: int = default_dim, workers: int = 4, down_sampling: float = 0.0001,
-    epochs: int = 10, learning_rate: float = 0.025, min_count: int = 5,
+    dimensions: int = default_dim, workers: int = 4,
+    down_sampling: float = 0.0001, epochs: int = 10,
+    learning_rate: float = 0.025, min_count: int = 5,
     seed: int = 42, erase_base_features: bool = False):
 
     self.wl_iterations = wl_iterations
@@ -208,27 +209,38 @@ class Graph2VecEncoder(encoder.Encoder):
     self, T: int = 3, embedding_dim: int = default_dim,
     node_label_count=0, edge_label_count=0,
     node_feature_dim=0, edge_feature_dim=0,
-    discrete_node_features=False, discrete_edge_features=False):
+    discrete_node_features=False, discrete_edge_features=False,
+    ignore_node_features=False, ignore_node_labels=False,
+    ignore_edge_features=False, ignore_edge_labels=False):
     self.name = f"graph2vec_T{T}_d{embedding_dim}"
     self.T = T
     self.embedding_dim = embedding_dim
-    self.node_labels = node_label_count > 0
-    self.edge_labels = edge_label_count > 0
-    self.node_features = discrete_node_features and node_feature_dim > 0
-    self.edge_features = discrete_edge_features and edge_feature_dim > 0
+    self.node_labels = node_label_count > 0 and not ignore_node_labels
+    self.edge_labels = edge_label_count > 0 and not ignore_edge_labels
+    self.node_features = (
+      discrete_node_features and not ignore_node_features
+      and node_feature_dim > 0)
+    self.edge_features = (
+      discrete_edge_features and not ignore_edge_features
+      and edge_feature_dim > 0)
     self.node_attributes = []
     self.edge_attributes = []
 
-    if self.node_labels:
-      self.node_attributes.append("label")
     if self.node_features:
       self.node_attributes.append("features")
       self.name += "_nf"
-    if self.edge_labels:
-      self.edge_attributes.append("label")
+    if self.node_labels:
+      self.node_attributes.append("label")
+    elif ignore_node_labels and node_label_count > 0:
+      self.name += "_inl"
+
     if self.edge_features:
       self.edge_attributes.append("features")
       self.name += "_ef"
+    if self.edge_labels:
+      self.edge_attributes.append("label")
+    elif ignore_edge_labels and edge_label_count > 0:
+      self.name += "_iel"
 
   def preprocess(self, graphs):
     g2v = Graph2Vec(

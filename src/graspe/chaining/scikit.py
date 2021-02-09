@@ -18,7 +18,7 @@ class SkModel:
     self.out_enc = self.config.get("out_enc", None)
     self.config = config
     model, metric = utils.tolerant_method(self.model_factory)(
-      **fy.merge(self.defaults, config))
+      **fy.merge(config, self.defaults))
     self.model = model
     self.metric_name = metric
 

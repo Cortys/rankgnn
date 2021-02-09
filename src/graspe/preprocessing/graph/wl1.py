@@ -7,16 +7,24 @@ import graspe.preprocessing.encoder as encoder
 import graspe.preprocessing.preference.utility as pref_util
 
 @tolerant
-def feature_dim(node_feature_dim=0, node_label_count=0):
+def feature_dim(
+  node_feature_dim=0, node_label_count=0,
+  ignore_node_features=False, ignore_node_labels=False):
+  if ignore_node_features:
+    node_feature_dim = 0
+  if ignore_node_labels:
+    node_label_count = 0
+
   return max(node_feature_dim + node_label_count, 1)
 
 def encode_graph(
   g, node_ordering=None,
-  node_feature_dim=None, node_label_count=None):
-  if node_feature_dim is None:
+  node_feature_dim=None, node_label_count=None,
+  ignore_node_features=False, ignore_node_labels=False):
+  if node_feature_dim is None or ignore_node_features:
     node_feature_dim = 0
 
-  if node_label_count is None:
+  if node_label_count is None or ignore_node_labels:
     node_label_count = 0
 
   if node_ordering is None:
@@ -73,10 +81,21 @@ class WL1Encoder(encoder.ObjectEncoder):
   name = "wl1"
 
   def __init__(
-    self, node_feature_dim=None, node_label_count=None, ordered=False):
+    self, node_feature_dim=None, node_label_count=None,
+    ignore_node_features=False, ignore_node_labels=False,
+    ordered=False):
     self.node_feature_dim = node_feature_dim
     self.node_label_count = node_label_count
+    self.ignore_node_features = ignore_node_features
+    self.ignore_node_labels = ignore_node_labels
     self.ordered = ordered
+
+    if ordered:
+      self.name += "_ord"
+    if ignore_node_features and node_feature_dim > 0:
+      self.name += "_inf"
+    if ignore_node_labels and node_label_count > 0:
+      self.name += "_inl"
 
   def encode_element(self, graph):
     if self.ordered:
@@ -88,6 +107,8 @@ class WL1Encoder(encoder.ObjectEncoder):
       graph,
       node_feature_dim=self.node_feature_dim,
       node_label_count=self.node_label_count,
+      ignore_node_features=self.ignore_node_features,
+      ignore_node_labels=self.ignore_node_labels,
       node_ordering=node_ordering)
 
 def make_wl1_batch(graphs, masking=False):

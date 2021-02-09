@@ -143,9 +143,10 @@ def sort_experiment(provider, model, **config):
 # provider = syn.triangle_classification_dataset()
 # provider = syn.triangle_count_dataset()
 # provider = syn.triangle_count_dataset(default_split="count_extrapolation")
-# provider = tu.ZINC(in_memory_cache=False)
+# provider = tu.ZINC_full(in_memory_cache=False)
+provider = tu.TRIANGLES(in_memory_cache=False)
 # provider = ogb.Mollipo()
-provider = ogb.Molesol()
+# provider = ogb.Molesol()
 
 # model = gnn.CmpGIN
 # model = gnn.DirectRankGIN
@@ -155,6 +156,5 @@ provider = ogb.Molesol()
 # model = svm.KernelSVM
 model = svm.SVM
 # model = nn.MLP
-# provider.get(("graph2vec", "float"))
 
 m = sort_experiment(provider, model, epochs=1000, T=5, prefer_in_enc="wlst")

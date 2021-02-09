@@ -24,6 +24,7 @@ class DatasetProvider:
     inner_holdout=0.1,
     outer_holdout=0.1,
     default_split=0,
+    default_preprocess_config=None,
     stratify=True,
     name_suffix="",
     in_memory_cache=True):
@@ -37,6 +38,7 @@ class DatasetProvider:
     self.outer_holdout = outer_holdout
     self.inner_holdout = inner_holdout
     self.default_split = default_split
+    self.default_preprocess_config = default_preprocess_config
     self.stratify = stratify and loader.stratifiable
     self.name_suffix = name_suffix
     self.in_memory_cache = in_memory_cache
@@ -143,6 +145,12 @@ class DatasetProvider:
     return self._make_named_splits()
 
   def _get_preprocessor(self, enc, config, reconfigurable_finalization=False):
+    if self.default_preprocess_config is not None:
+      if config is None:
+        config = self.default_preprocess_config
+      else:
+        config = fy.merge(self.default_preprocess_config, config)
+
     return preproc.find_preprocessor(self.dataset_type, enc)(
       self.in_meta, self.out_meta, config, reconfigurable_finalization)
 

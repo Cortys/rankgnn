@@ -6,10 +6,20 @@ import graspe.preprocessing.scikit as sk_enc
 
 def svm_model(in_enc, out_enc, **config):
   if out_enc == "class":
-    cls = svm.SVC
+    if config.get("kernel", "linear") == "linear":
+      cls = svm.LinearSVC
+      if "dual" not in config:
+        config["dual"] = False
+    else:
+      cls = svm.SVC
     metric = "accuracy"
   else:
-    cls = svm.SVR
+    if config.get("kernel", "linear") == "linear":
+      cls = svm.LinearSVR
+      if "dual" not in config:
+        config["dual"] = False
+    else:
+      cls = svm.SVR
     metric = "r2"
 
   return utils.tolerant(cls, ignore_varkwargs=True)(**config), metric

@@ -164,6 +164,14 @@ class Graph2Vec:
     self.min_count = min_count
     self.seed = seed
     self.erase_base_features = erase_base_features
+    self._model = None
+
+  def _graph_to_words(self, graph):
+    wl_hashes = WeisfeilerLehmanHashing(
+      graph, self.wl_iterations, self.erase_base_features,
+      self.node_attributes, self.edge_attributes)
+
+    return wl_hashes.get_graph_features()
 
   def fit(self, graphs: List[nx.classes.graph.Graph]):
     """
@@ -173,13 +181,9 @@ class Graph2Vec:
     """
     random.seed(self.seed)
     np.random.seed(self.seed)
-    documents = [WeisfeilerLehmanHashing(
-      graph, self.wl_iterations, self.erase_base_features,
-      self.node_attributes, self.edge_attributes)
-      for graph in graphs]
     documents = [
-      TaggedDocument(words=doc.get_graph_features(), tags=[str(i)])
-      for i, doc in enumerate(documents)]
+      TaggedDocument(words=self._graph_to_words(g), tags=[str(i)])
+      for i, g in enumerate(graphs)]
 
     model = Doc2Vec(
       documents,
@@ -193,14 +197,22 @@ class Graph2Vec:
       alpha=self.learning_rate,
       seed=self.seed)
 
+    self._model = model
     self._embedding = [model.dv[str(i)] for i, _ in enumerate(documents)]
 
-  def get_embedding(self) -> np.array:
+  def get_embedding(self, graphs=None) -> np.array:
     r"""Getting the embedding of graphs.
     Return types:
       * **embedding** *(Numpy array)* - The embedding of graphs.
     """
-    return np.array(self._embedding)
+    assert self._model is not None, "Model not yet fitted."
+
+    if graphs is None:
+      return np.array(self._embedding)
+
+    return np.array([
+      self._model.infer_vector(self._graph_to_words(g))
+      for g in graphs])
 
 class Graph2VecEncoder(encoder.Encoder):
   name = "graph2vec"

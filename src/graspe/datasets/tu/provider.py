@@ -61,9 +61,17 @@ class TUDatasetLoader(loader.DatasetLoader):
     graphs_a = utils.obj_array(graphs)
     out_targets = np.array(out_targets)
 
+    config = self.config.copy()
+    if "discrete_node_features" in config:
+      in_meta["discrete_node_features"] = config["discrete_node_features"]
+      del config["discrete_node_features"]
+    if "discrete_edge_features" in config:
+      in_meta["discrete_edge_features"] = config["discrete_edge_features"]
+      del config["discrete_edge_features"]
+
     return dict(
       elements=(graphs_a, out_targets),
-      in_meta=in_meta, out_meta=self.config,
+      in_meta=in_meta, out_meta=config,
       size=len(out_targets),
       stratify_labels=out_targets if self.stratifiable else None)
 

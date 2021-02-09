@@ -1,19 +1,18 @@
 import grakel as gk
-import funcy as fy
 
 from graspe.preprocessing.kernel import KernelEncoder
 
 class GrakelEncoder(KernelEncoder):
   def __init__(
-    self, name, kernel,
+    self, name, kernel, nystroem=None,
     node_label_count=0, edge_label_count=0,
     node_feature_dim=0, edge_feature_dim=0,
     discrete_node_features=False, discrete_edge_features=False,
     ignore_node_features=False, ignore_node_labels=False,
     ignore_edge_features=False, ignore_edge_labels=False,
     **config):
-    super().__init__()
-    self.kernel = gk.GraphKernel(kernel=kernel)
+    super().__init__(nystroem=nystroem)
+    self.kernel = gk.GraphKernel(kernel=kernel, Nystroem=nystroem)
     self.node_labels = node_label_count > 0 and not ignore_node_labels
     self.edge_labels = edge_label_count > 0 and not ignore_edge_labels
     self.node_features = (
@@ -23,6 +22,9 @@ class GrakelEncoder(KernelEncoder):
       discrete_edge_features and not ignore_edge_features
       and edge_feature_dim > 0)
     self.name = name
+
+    if self.nystroem:
+      self.name += f"_sub{nystroem}"
 
     if self.node_features:
       self.name += "_nf"
@@ -74,11 +76,8 @@ class GrakelEncoder(KernelEncoder):
       relabel = True
 
     if relabel:
-      enc_graphs = fy.map(
-        lambda r: [
-          r[1][0],
-          node_labeler(r[0], r[1]),
-          edge_labeler(r[0], r[1])],
-        enumerate(enc_graphs))
+      enc_graphs = [
+        [r[0], node_labeler(i, r), edge_labeler(i, r)]
+        for i, r in enumerate(enc_graphs)]
 
     return self.kernel.fit_transform(enc_graphs)

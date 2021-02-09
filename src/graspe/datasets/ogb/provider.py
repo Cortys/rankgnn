@@ -43,20 +43,21 @@ class OGBDatasetLoader(loader.DatasetLoader):
     for i, g in enumerate(ds.graphs):
       graphs[i] = ogb_utils.create_graph_from_ogb(g)
     in_meta = utils.graphs_meta(graphs, labels=False)
-    if "discrete_node_features" in self.config:
-      in_meta["discrete_node_features"] = self.config["discrete_node_features"]
-      del self.config["discrete_node_features"]
-    if "discrete_edge_features" in self.config:
-      in_meta["discrete_edge_features"] = self.config["discrete_edge_features"]
-      del self.config["discrete_edge_features"]
+    config = self.config.copy()
+    if "discrete_node_features" in config:
+      in_meta["discrete_node_features"] = config["discrete_node_features"]
+      del config["discrete_node_features"]
+    if "discrete_edge_features" in config:
+      in_meta["discrete_edge_features"] = config["discrete_edge_features"]
+      del config["discrete_edge_features"]
 
-    if self.config["type"] in {"binary", "integer", "float"}:
+    if config["type"] in {"binary", "integer", "float"}:
       targets = np.squeeze(targets)
 
     return dict(
       elements=(graphs, targets),
       in_meta=in_meta,
-      out_meta=self.config,
+      out_meta=config,
       size=size,
       stratify_labels=targets if self.stratifiable else None)
 

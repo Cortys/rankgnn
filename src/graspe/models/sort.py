@@ -71,13 +71,13 @@ def model_sort(indices, provider_get, model, **config):
 
 def evaluate_model_sort(indices, provider_get, model, **config):
   print("Loading target rankings...")
-  _, object_rankings = provider_get(indices=indices)
+  _, object_rankings = provider_get(indices=indices, config=config)
   print(f"Loaded {len(object_rankings)} target rankings.")
 
   if "pref" in model.in_enc:
     predicted_ordering = model_sort(indices, provider_get, model, **config)
   elif model.out_enc == "float":
-    data = provider_get(model.enc, indices=indices)
+    data = provider_get(model.enc, indices=indices, config=config)
     predicted_rankings = model.predict(data)
     predicted_ordering = indices[np.argsort(predicted_rankings)]
   else:

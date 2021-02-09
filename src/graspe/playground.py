@@ -70,8 +70,9 @@ def experiment(
     activation="sigmoid", inner_activation="relu",
     # att_conv_activation="relu",
     pooling="sum",
-    kernel="rbf", C=0.1)
-  print("Instanciated model.", enc)
+    # kernel="rbf",
+    C=0.1)
+  print("Instanciated model.")
   if provider.dataset_size < 10:
     ds_train = provider.get(enc)
     ds_val, ds_test = ds_train, ds_train
@@ -107,6 +108,7 @@ def experiment(
       histogram_freq=50,
       profile_batch="100,115")
     print("Compiled model.")
+    print("Fitting Keras model...")
 
     m.fit(
       ds_train.cache(),
@@ -114,6 +116,7 @@ def experiment(
       epochs=epochs, verbose=verbose,
       callbacks=[tb] if log else [])
   else:
+    print("Fitting model...")
     m.fit(ds_train, validation_data=ds_val)
 
   print("Completed training.")
@@ -134,9 +137,9 @@ def sort_experiment(provider, model, **config):
   test_get = provider.get_test_split
 
   bsl = 1000
-  print("Train", sort.evaluate_model_sort(train_idxs, train_get, m, batch_size_limit=bsl))
-  print("Val", sort.evaluate_model_sort(val_idxs, val_get, m, batch_size_limit=bsl))
-  print("Test", sort.evaluate_model_sort(test_idxs, test_get, m, batch_size_limit=bsl))
+  print("Train", sort.evaluate_model_sort(train_idxs, train_get, m, batch_size_limit=bsl, **config))
+  print("Val", sort.evaluate_model_sort(val_idxs, val_get, m, batch_size_limit=bsl, **config))
+  print("Test", sort.evaluate_model_sort(test_idxs, test_get, m, batch_size_limit=bsl, **config))
   return m
 
 
@@ -157,4 +160,8 @@ provider = tu.TRIANGLES(in_memory_cache=False)
 model = svm.SVM
 # model = nn.MLP
 
-m = sort_experiment(provider, model, epochs=1000, T=5, prefer_in_enc="wlst")
+print("no feats:")
+sort_experiment(provider, model, epochs=1000, T=2, prefer_in_enc="wlst", ignore_node_features=True)
+print()
+print("with feats:")
+sort_experiment(provider, model, epochs=1000, T=2, prefer_in_enc="wlst", ignore_node_features=False)

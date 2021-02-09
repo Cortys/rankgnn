@@ -5,6 +5,10 @@ import graspe.preprocessing.encoder as encoder
 class KernelEncoder(encoder.Encoder, metaclass=ABCMeta):
   name = None
 
+  def __init__(self, nystroem=None):
+    super().__init__()
+    self.nystroem = nystroem
+
   @abstractmethod
   def _compute_kernel(self, graphs):
     pass
@@ -14,6 +18,9 @@ class KernelEncoder(encoder.Encoder, metaclass=ABCMeta):
 
   def slice(self, gram, indices, train_indices=None):
     assert train_indices is not False, "Presplit data not yet supported."
+
+    if self.nystroem:
+      return gram[indices, :]
 
     if train_indices is None:
       train_indices = indices

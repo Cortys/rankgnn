@@ -1,6 +1,5 @@
 import numpy as np
 
-import graspe.utils as utils
 from graspe.datasets.tu.provider import tu_dataset, presplit_tu_dataset
 
 # Binary:
@@ -23,7 +22,8 @@ TRIANGLES = tu_dataset(
     rng.permutation(30000),
     rng.permutation(5000) + 30000,
     rng.permutation(10000) + 35000),
-  default_preprocess_config=dict(ignore_node_features=True))
+  discrete_node_features=True,  # nodes are annotated with triangle counts
+  default_preprocess_config=dict(ignore_node_features=True))  # ignore counts
 
 rng = np.random.default_rng(42)
 ZINC_full = tu_dataset(

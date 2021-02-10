@@ -119,8 +119,7 @@ def experiment(
     print("Fitting model...")
     m.fit(ds_train, validation_data=ds_val)
 
-  print("Completed training.")
-  m.evaluate(ds_test)
+  print("Completed training.", m.evaluate(ds_test))
   print(np.around(m.predict(ds_test), 2))
   return m
 
@@ -156,12 +155,13 @@ provider = tu.TRIANGLES(in_memory_cache=False)
 # model = gnn.DirectRankWL2GNN
 # model = gnn.WL2GNN
 # model = gnn.GIN
-# model = svm.KernelSVM
-model = svm.SVM
+model = svm.KernelSVM
+# model = svm.SVM
 # model = nn.MLP
+#
 
 print("no feats:")
-sort_experiment(provider, model, epochs=1000, T=2, prefer_in_enc="wlst", ignore_node_features=True)
+m = sort_experiment(provider, model, epochs=1000, T=5, prefer_in_enc="wlst", ignore_node_features=True, nystroem=500)
 print()
 print("with feats:")
-sort_experiment(provider, model, epochs=1000, T=2, prefer_in_enc="wlst", ignore_node_features=False)
+sort_experiment(provider, model, epochs=1000, T=5, prefer_in_enc="wlst", ignore_node_features=False, nystroem=500)

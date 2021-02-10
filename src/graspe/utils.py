@@ -49,7 +49,10 @@ def tolerant_method(f):
 
 fully_tolerant = tolerant(only_named=False)
 
-def select_prefixed_keys(map, prefix, include_others=False, target=dict()):
+def select_prefixed_keys(map, prefix, include_others=False, target=None):
+  if target is None:
+    target = dict()
+
   for k, v in map.items():
     if k.startswith(prefix):
       target[k[len(prefix):]] = v

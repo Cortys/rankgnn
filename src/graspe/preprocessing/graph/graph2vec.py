@@ -45,20 +45,20 @@ class WeisfeilerLehmanHashing:
     if self.node_attributes:
       attrs = self.node_attributes
       self.features = {
-        n: [d[a] for a in attrs]
+        n: ",".join([str(d[a]) for a in attrs])
         for n, d in g.nodes.items()}
     else:
       self.features = {
-        node: g.degree(node)
+        node: str(g.degree(node))
         for node in g.nodes()}
 
     if self.edge_attributes and len(self.edge_attributes) > 0:
       eattrs = self.edge_attributes
       self.edge_features = {
-        (v, u): str([g.edges[v, u][a] for a in eattrs])
+        (v, u): ",".join([str(g.edges[v, u][a]) for a in eattrs])
         for v in g.nodes
         for u in g.neighbors(v)
-        }
+      }
     else:
       self.edge_features = None
 
@@ -82,11 +82,11 @@ class WeisfeilerLehmanHashing:
       nebs = self.graph.neighbors(node)
       if self.edge_features:
         neb_fs = [
-          (self.edge_features[(node, neb)], self.features[neb])
+          self.edge_features[(node, neb)] + ":" + self.features[neb]
           for neb in nebs]
       else:
         neb_fs = [self.features[neb] for neb in nebs]
-      features = [str(self.features[node])]+sorted([str(f) for f in neb_fs])
+      features = [str(self.features[node])]+sorted(neb_fs)
       features = "_".join(features)
       hash_object = hashlib.md5(features.encode())
       hashing = hash_object.hexdigest()
@@ -165,6 +165,7 @@ class Graph2Vec:
     self.seed = seed
     self.erase_base_features = erase_base_features
     self._model = None
+    self._loaded = False
 
   def _graph_to_words(self, graph):
     wl_hashes = WeisfeilerLehmanHashing(
@@ -173,12 +174,22 @@ class Graph2Vec:
 
     return wl_hashes.get_graph_features()
 
+  def load(self, file):
+    self._model = Doc2Vec.load(str(file))
+    self._loaded = True
+    return self
+
+  def save(self, file):
+    assert self._model is not None, "Model not yet fitted."
+    self._model.save(str(file))
+
   def fit(self, graphs: List[nx.classes.graph.Graph]):
     """
     Fitting a Graph2Vec model.
     Arg types:
       * **graphs** *(List of NetworkX graphs)* - The graphs to be embedded.
     """
+    assert not self._loaded, "Loaded models cannot be refitted."
     random.seed(self.seed)
     np.random.seed(self.seed)
     documents = [
@@ -214,8 +225,10 @@ class Graph2Vec:
       self._model.infer_vector(self._graph_to_words(g))
       for g in graphs])
 
-class Graph2VecEncoder(encoder.Encoder):
+class Graph2VecEncoder(encoder.ObjectEncoder):
   name = "graph2vec"
+  can_slice_encoded = False  # Due to inter-graph dependencies
+  uses_train_metadata = True
 
   def __init__(
     self, T: int = 3, embedding_dim: int = default_dim,
@@ -254,22 +267,28 @@ class Graph2VecEncoder(encoder.Encoder):
     elif ignore_edge_labels and edge_label_count > 0:
       self.name += "_iel"
 
-  def preprocess(self, graphs):
-    g2v = Graph2Vec(
-      wl_iterations=self.T, dimensions=self.embedding_dim,
-      node_attributes=self.node_attributes,
-      edge_attributes=self.edge_attributes)
-    g2v.fit(graphs)
-
-    return g2v.get_embedding()
-
-  def slice(self, embeddings, indices, train_indices=None):
-    assert train_indices is not False, "Presplit data not yet supported."
-    return super().slice(embeddings, indices, train_indices)
-
   def encode_element(self, graph):
     raise AssertionError(
       "Graph-by-graph transformation does not work for gram computation.")
 
-  def transform(self, graphs):
-    return self.preprocess(graphs)
+  def _create_g2v(self):
+    return Graph2Vec(
+      wl_iterations=self.T, dimensions=self.embedding_dim,
+      node_attributes=self.node_attributes,
+      edge_attributes=self.edge_attributes)
+
+  def produce_train_metadata(self, graphs):
+    g2v = self._create_g2v()
+    g2v.fit(graphs)
+
+    return g2v
+
+  def transform(self, graphs, train_metadata=None):
+    assert train_metadata is not None, "Embedder not yet trained."
+    if isinstance(train_metadata, Graph2Vec):
+      g2v = train_metadata
+    else:
+      g2v = self._create_g2v()
+      g2v.load(train_metadata)
+
+    return g2v.get_embedding(graphs)

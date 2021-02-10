@@ -1,5 +1,6 @@
 import funcy as fy
 import numpy as np
+from collections import defaultdict
 from pathlib import Path
 
 import graspe.utils as utils
@@ -42,6 +43,7 @@ class DatasetProvider:
     self.stratify = stratify and loader.stratifiable
     self.name_suffix = name_suffix
     self.in_memory_cache = in_memory_cache
+    self._train_metadata_lut = defaultdict(dict)
 
   @property
   def in_meta(self):
@@ -107,6 +109,9 @@ class DatasetProvider:
   def unload_dataset(self):
     self._dataset = None
 
+  def unload_train_metadata(self):
+    self._train_metadata_lut = defaultdict(dict)
+
   def __make_model_selection_splits(self, train_o, strat_o=None):
     if self.inner_k is None:
       train_i, val_i, _ = preproc_utils.make_holdout_split(
@@ -154,10 +159,35 @@ class DatasetProvider:
     return preproc.find_preprocessor(self.dataset_type, enc)(
       self.in_meta, self.out_meta, config, reconfigurable_finalization)
 
+  def _get_train_metadata_key(self, index_id, ds_id=None):
+    if index_id is None:
+      return None
+    assert isinstance(index_id, tuple), f"Unsupported index id {index_id}."
+    return index_id[:-1]
+
+  def _get_train_metadata_hook(self, pre, index_id, ds_id=None):
+    key = self._get_train_metadata_key(index_id, ds_id)
+    pre_name = pre.preprocessed_name
+    pre_names = pre.preprocessed_names
+
+    def hook(produce_metadata, i):
+      key2 = pre_names[i] if i is not None else pre_name
+      if key2 in self._train_metadata_lut[key]:
+        return self._train_metadata_lut[key][key2]
+      metadata = produce_metadata(i)
+      self._train_metadata_lut[key][key2] = metadata
+      return metadata
+
+    hook.key = key
+
+    return hook
+
   def _preprocess(
     self, pre: preproc.Preprocessor, ds_get, indices, train_indices,
-    index_id=None, finalize=True, ds_id=None):
-    return pre.transform(ds_get(), indices, train_indices, finalize)
+    index_id=None, finalize=True, ds_id=None, train_ds_get=None):
+    return pre.hooked_transform(
+      ds_get, indices, train_indices, train_ds_get, finalize,
+      train_metadata_hook=self._get_train_metadata_hook(pre, index_id, ds_id))
 
   def get(
     self, enc=None, config=None,
@@ -169,7 +199,6 @@ class DatasetProvider:
     if preprocessor is None:
       preprocessor = self._get_preprocessor(
         enc, config, reconfigurable_finalization)
-
     if shuffle:
       if indices is None:
         indices = np.arange(self.dataset_size)
@@ -177,8 +206,9 @@ class DatasetProvider:
         indices = np.array(indices)
       np.random.shuffle(indices)
       if index_id is None:
-        index_id = ()
-      index_id += ("shuffled",)
+        index_id = ("shuffled",)
+      else:
+        index_id = ("shuffled",) + index_id
 
     return self._preprocess(
       preprocessor, lambda: self.dataset,
@@ -397,46 +427,65 @@ class CachingDatasetProvider(DatasetProvider):
 
   def _preprocess(
     self, pre: preproc.Preprocessor, ds_get, indices, train_indices,
-    index_id=None, finalize=True, ds_id=None):
+    index_id=None, finalize=True, ds_id=None, train_ds_get=None):
+    preprocessed_cache = pre.preprocessed_cacheable and self.preprocessed_cache
+    preprocessed_dir = self.data_dir / pre.preprocessed_name
     ds_suffix = "" if ds_id is None else "_" + "_".join(fy.map(str, ds_id))
     idx_suffix = "" if index_id is None else "_" + "_".join(
       fy.map(str, index_id))
-    preprocessed_cache = pre.preprocessed_cacheable and self.preprocessed_cache
-    preprocessed_dir = self.data_dir / pre.preprocessed_name
-    orthogonal_preprocess = pre.orthogonal_preprocess
-    preprocessed_dirs = [self.data_dir / d for d in pre.preprocessed_names]
-    if preprocessed_cache:
-      if orthogonal_preprocess:
-        for d in preprocessed_dirs:
-          utils.make_dir(d)
-      else:
-        utils.make_dir(preprocessed_dir)
-    preprocessed_format = pre.preprocessed_format or "pickle"
 
-    def preproc():
-      f = ds_get
-      if indices is not None and not pre.slice_after_preprocess:
-        f = lambda: pre.slice(ds_get(), indices, train_indices)
-        pre_fname = f"{self.name}{ds_suffix}{idx_suffix}.{preprocessed_format}"
-      else:
-        pre_fname = f"{self.name}{ds_suffix}.{preprocessed_format}"
+    def transform():
+      train_metadata_hook = self._get_train_metadata_hook(
+        pre, index_id, ds_id)
+      train_metadata_key = train_metadata_hook.key
 
       if preprocessed_cache:
+        orthogonal_preprocess = pre.orthogonal_preprocess
+        preproc_format = pre.preprocessed_format or "pickle"
+        preprocessed_dirs = [self.data_dir / d for d in pre.preprocessed_names]
         if orthogonal_preprocess:
-          f = utils.memoize(f)
-          ds = tuple(
-            utils.cache(lambda: pre.preprocess(f()[i], only=i), d / pre_fname)
-            for i, d in enumerate(preprocessed_dirs))
+          for d in preprocessed_dirs:
+            utils.make_dir(d)
         else:
-          preprocess_file = preprocessed_dir / pre_fname
-          ds = utils.cache(lambda: pre.preprocess(f()), preprocess_file)
+          utils.make_dir(preprocessed_dir)
+
+        meta_suffix = "" if train_metadata_key is None else "_" + "_".join(
+          fy.map(str, train_metadata_key))
+        meta_fname_base = f"{self.name}{meta_suffix}_train_meta"
+        meta_fname = f"{meta_fname_base}.pickle"
+        meta_fname_custom = f"{meta_fname_base}.custom"
+        pre_fname = f"{self.name}{ds_suffix}.{preproc_format}"
+        pre_fname_idx = f"{self.name}{ds_suffix}{idx_suffix}.{preproc_format}"
+
+        def preprocess_hook(f, i, slice):
+          d = preprocessed_dir if i is None else preprocessed_dirs[i]
+          file = pre_fname_idx if slice else pre_fname
+          return utils.cache(lambda: f(i, slice), d / file)
+
+        base_metadata_hook = train_metadata_hook
+
+        def train_metadata_hook(f, i):
+          d = preprocessed_dir if i is None else preprocessed_dirs[i]
+          custom_file = d / meta_fname_custom
+          if custom_file.exists():
+            return custom_file
+          file = d / meta_fname
+          if file.exists():
+            return utils.cache_read(file, format="pickle")
+
+          train_metadata = base_metadata_hook(f, i)
+          if train_metadata is not None and hasattr(train_metadata, "save"):
+            train_metadata.save(custom_file)
+          else:
+            utils.cache_write(file, train_metadata, format="pickle")
+
+          return train_metadata
       else:
-        ds = pre.preprocess(f())
+        preprocess_hook = None
 
-      if indices is not None and pre.slice_after_preprocess:
-        ds = pre.slice(ds, indices, train_indices)
-
-      return pre.finalize(ds) if finalize else ds
+      return pre.hooked_transform(
+        ds_get, indices, train_indices, train_ds_get,
+        finalize, preprocess_hook, train_metadata_hook)
 
     if finalize and pre.finalized_cacheable and self.finalize_cache:
       finalized_dir = utils.make_dir(
@@ -445,9 +494,9 @@ class CachingDatasetProvider(DatasetProvider):
       finalized_file = finalized_dir / \
           f"{self.name}{ds_suffix}{idx_suffix}.{finalized_format}"
       return utils.cache(
-        preproc, finalized_file, finalized_format)
+        transform, finalized_file, finalized_format)
     else:
-      return preproc()
+      return transform()
 
 class PresplitDatasetProvider(DatasetProvider):
   loader: ldr.PresplitDatasetLoader = None
@@ -607,6 +656,10 @@ class PresplitDatasetProvider(DatasetProvider):
       self.get_validation_split_indices(),
       self.get_test_split_indices())
 
+  def _get_train_metadata_key(self, index_id, ds_id=None):
+    assert index_id is None, f"Unsupported index id {index_id}."
+    return None  # Only one possible training set.
+
   def get_split(
     self, enc=None, config=None, outer_idx=None, inner_idx=None,
     only=None, finalize=True, reconfigurable_finalization=False, indices=None):
@@ -626,14 +679,16 @@ class PresplitDatasetProvider(DatasetProvider):
     if self.loader.val and (only is None or only == "val"):
       val_ds = self._preprocess(
         pre, lambda: self.validation_dataset,
-        indices, False, None, finalize, ("val",))
+        indices, False, None, finalize, ("val",),
+        lambda: self.train_dataset)
       if only == "val":
         return val_ds
       res += (val_ds,)
     if self.loader.test and (only is None or only == "test"):
       test_ds = self._preprocess(
         pre, lambda: self.test_dataset,
-        indices, False, None, finalize, ("test",))
+        indices, False, None, finalize, ("test",),
+        lambda: self.train_dataset)
       if only == "test":
         return test_ds
       res += (test_ds,)

@@ -143,25 +143,24 @@ def sort_experiment(provider, model, **config):
 
 
 # provider = syn.triangle_classification_dataset()
-# provider = syn.triangle_count_dataset()
+provider = syn.triangle_count_dataset()
 # provider = syn.triangle_count_dataset(default_split="count_extrapolation")
 # provider = tu.ZINC_full(in_memory_cache=False)
-provider = tu.TRIANGLES(in_memory_cache=False)
+# provider = tu.TRIANGLES(in_memory_cache=False)
 # provider = ogb.Mollipo()
 # provider = ogb.Molesol()
 
 # model = gnn.CmpGIN
 # model = gnn.DirectRankGIN
 # model = gnn.DirectRankWL2GNN
-# model = gnn.WL2GNN
+model = gnn.WL2GNN
 # model = gnn.GIN
-model = svm.KernelSVM
+# model = svm.KernelSVM
 # model = svm.SVM
 # model = nn.MLP
-#
 
 print("no feats:")
 m = sort_experiment(provider, model, epochs=1000, T=5, prefer_in_enc="wlst", ignore_node_features=True, nystroem=500)
 print()
-print("with feats:")
-sort_experiment(provider, model, epochs=1000, T=5, prefer_in_enc="wlst", ignore_node_features=False, nystroem=500)
+# print("with feats:")
+# sort_experiment(provider, model, epochs=1000, T=5, prefer_in_enc="wlst", ignore_node_features=False, nystroem=500)

@@ -58,8 +58,7 @@ def sort(indices, compare):
   return sorted_indices
 
 def model_sort(indices, provider_get, model, **config):
-  enc = (model.in_enc, model.out_enc)
-  data_getter = provider_get(enc, config={
+  data_getter = provider_get(model.enc, config={
     **config, "mode": "pivot_partitions"},
     reconfigurable_finalization=True)
 
@@ -83,6 +82,6 @@ def evaluate_model_sort(indices, provider_get, model, **config):
   else:
     raise Exception(f"Unsupported enc {model.enc}.")
 
-  print("Computing tau...")
-  return rank_metric.bucket_sorted_tau(
+  print("Computing sort metrics...")
+  return rank_metric.uocked_sorted_metrics(
     indices, object_rankings, predicted_ordering)

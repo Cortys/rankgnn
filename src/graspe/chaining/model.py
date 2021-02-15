@@ -95,14 +95,16 @@ def add_enc(model, in_enc=None, out_enc=None, family=None):
 def create_model(
   as_model, name, steps, extend_at=None,
   input_encodings=[], output_encodings=[],
-  model_family=None,
+  model_family=None, arg_transformer=None,
   **kwargs):
   input_encodings = set(input_encodings)
   output_encodings = set(output_encodings)
   modelFactory = pipeline.create_pipeline(
     [*steps, as_model(name), add_enc],
-    arg_transformer=process_model_encs(
-      input_encodings, output_encodings, model_family),
+    arg_transformer=fy.compose(
+      arg_transformer or fy.identity,
+      process_model_encs(
+        input_encodings, output_encodings, model_family)),
     **kwargs)
 
   def extend(

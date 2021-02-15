@@ -70,6 +70,7 @@ def experiment(
     activation="sigmoid", inner_activation="relu",
     # att_conv_activation="relu",
     pooling="sum",
+    learning_rate=0.0001,
     # kernel="rbf",
     C=0.1)
   print("Instanciated model.")
@@ -86,21 +87,6 @@ def experiment(
   provider.unload_dataset()
 
   if isinstance(m, keras.Model):
-    opt = keras.optimizers.Adam(0.0001)
-
-    if out_enc == "multiclass":
-      loss = "categorical_crossentropy"
-      metrics = ["categorical_accuracy"]
-    elif out_enc == "binary":
-      loss = "binary_crossentropy"
-      metrics = ["binary_accuracy"]
-    else:
-      loss = "mean_squared_error"
-      metrics = ["mean_absolute_error"]
-
-    m.compile(
-      optimizer=opt, loss=loss, metrics=metrics)
-
     t = time_str()
     log_dir = f"../logs/{t}_{m.name}_{provider.name}/"
     tb = keras.callbacks.TensorBoard(

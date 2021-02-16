@@ -19,8 +19,13 @@ def resume(mf, dsm, **kwargs):
   return evaluate.resume_evaluation(mf, dsm, **kwargs)
 
 def summarize(mf, dsm, **kwargs):
+  if dsm.default_split != 0:
+    split = dsm.default_split
+  else:
+    split = None
+
   return summary.summarize_evaluation(
-    evaluate.find_eval_dir(mf, dsm))
+    evaluate.find_eval_dir(mf, dsm, split=split))
 
 def epoch_times(mf, dsm, **kwargs):
   return evaluate.evaluate_epoch_time(mf, dsm)

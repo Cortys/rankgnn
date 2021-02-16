@@ -15,6 +15,7 @@ selection_metrics = {
   "categorical_accuracy": "max",
   "accuracy": "max",
   "r2": "max",
+  "tau": "max",
   "binary_crossentropy": "min",
   "categorical_crossentropy": "min",
   "loss": "min",

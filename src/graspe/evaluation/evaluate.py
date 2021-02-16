@@ -167,7 +167,7 @@ def sort_evaluator(ds_provider, enc, outer_idx, **config):
 
 def evaluate(
   model_factory, ds_provider,
-  split=None, repeat=1, winner_repeat=3, epochs=1000,
+  split=None, repeat=1, winner_repeat=3, epochs=2000,
   patience=100, stopping_min_delta=0.0001,
   restore_best=False, hp_args=None, label=None,
   selection_metric="accuracy",

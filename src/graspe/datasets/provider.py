@@ -30,9 +30,9 @@ class DatasetProvider:
     name_suffix="",
     in_memory_cache=True):
     self.loader = loader
-    assert outer_k is None or outer_k > 1
+    assert outer_k is None or outer_k > 0
     self.outer_k = outer_k
-    assert inner_k is None or inner_k > 1
+    assert inner_k is None or inner_k > 0
     self.inner_k = inner_k
     assert outer_k is not None or outer_holdout is not None
     assert inner_k is not None or inner_holdout is not None

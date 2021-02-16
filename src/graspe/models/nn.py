@@ -7,7 +7,7 @@ import graspe.chaining.keras as ck
 import graspe.preprocessing.tf as tf_enc
 
 @cm.model_inputs
-def inputs(in_enc, in_meta):
+def inputs(in_enc, in_meta={}):
   return tf_enc.make_inputs(in_enc, in_meta)
 
 @cm.model_step

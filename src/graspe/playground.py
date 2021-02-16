@@ -146,7 +146,10 @@ model = gnn.WL2GNN
 # model = nn.MLP
 
 print("no feats:")
-m = sort_experiment(provider, model, epochs=1000, T=5, prefer_in_enc="wlst", ignore_node_features=True, nystroem=500)
+# m = sort_experiment(provider, model, epochs=1000, T=5, prefer_in_enc="wlst", ignore_node_features=True, nystroem=500)
 print()
 # print("with feats:")
 # sort_experiment(provider, model, epochs=1000, T=5, prefer_in_enc="wlst", ignore_node_features=False, nystroem=500)
+
+m = model(out_enc="float", conv_layer_units=[10], fc_layer_units=[10,1])
+m.enc

@@ -51,6 +51,12 @@ def process_model_encs(input_encodings, output_encodings, model_family):
       if family is None and len(enc) > 2:
         family = enc[2]
 
+    if len(input_encodings) == 1 and in_enc is None:
+      in_enc = fy.first(input_encodings)
+
+    if len(output_encodings) == 1 and out_enc is None:
+      out_enc = fy.first(output_encodings)
+
     if in_enc is not None:
       assert in_enc in input_encodings,\
         f"'{in_enc}' inputs are not supported."

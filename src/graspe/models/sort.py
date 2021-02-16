@@ -57,31 +57,47 @@ def sort(indices, compare):
 
   return sorted_indices
 
-def model_sort(indices, provider_get, model, **config):
-  data_getter = provider_get(model.enc, config={
+def model_sort(indices, provider_get, model=None, enc=None, **config):
+  enc = enc or (model and model.enc)
+  assert enc is not None, "Unknown encoding."
+
+  data_getter = provider_get(enc, config={
     **config, "mode": "pivot_partitions"},
     reconfigurable_finalization=True)
 
-  def compare(partitions):
-    data = data_getter(pivot_partitions=partitions)
-    return model.predict(data)
+  def run(model):
+    def compare(partitions):
+      data = data_getter(pivot_partitions=partitions)
+      return model.predict(data)
 
-  return sort(indices, compare)
+    return sort(indices, compare)
 
-def evaluate_model_sort(indices, provider_get, model, **config):
+  return run if model is None else run(model)
+
+def evaluate_model_sort(indices, provider_get, model=None, enc=None, **config):
+  enc = enc or (model and model.enc)
+  assert enc is not None, "Unknown encoding."
+  in_enc = enc[0]
+  out_enc = enc[1]
+
   print("Loading target rankings...")
   _, object_rankings = provider_get(indices=indices, config=config)
   print(f"Loaded {len(object_rankings)} target rankings.")
 
-  if "pref" in model.in_enc:
-    predicted_ordering = model_sort(indices, provider_get, model, **config)
-  elif model.out_enc == "float":
-    data = provider_get(model.enc, indices=indices, config=config)
-    predicted_rankings = model.predict(data)
-    predicted_ordering = indices[np.argsort(predicted_rankings)]
-  else:
-    raise Exception(f"Unsupported enc {model.enc}.")
+  if "pref" in in_enc:
+    predicted_ordering = model_sort(indices, provider_get, enc=enc, **config)
+  elif out_enc == "float":
+    data = provider_get(enc, indices=indices, config=config)
 
-  print("Computing sort metrics...")
-  return rank_metric.uocked_sorted_metrics(
-    indices, object_rankings, predicted_ordering)
+    def predicted_ordering(model):
+      predicted_rankings = model.predict(data)
+      return indices[np.argsort(predicted_rankings)]
+  else:
+    raise Exception(f"Unsupported enc {enc}.")
+
+  def rank_metrics(model):
+    print("Computing sort metrics...")
+    return rank_metric.bucket_sorted_metrics(
+      indices, object_rankings, predicted_ordering(model))
+
+  return rank_metrics if model is None else rank_metrics(model)

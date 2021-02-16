@@ -60,6 +60,7 @@ def default_gnn_hyperparams(
 
   return cart_merge(cart(
     conv_activation=["sigmoid"],
+    att_conv_activation=["sigmoid"],
     fc_activation=["sigmoid"],
     fc_layer_args=fc_layer_args,
     conv_use_bias=[True],

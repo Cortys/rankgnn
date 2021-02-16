@@ -339,13 +339,18 @@ def evaluate(
         print(f"\nFold {fold_str} with hyperparams {hp_str}.")
 
         for i in range(curr_i_start, repeat):
-          completed_evaluation_step |= evaluation_step(
-            model_ctr, train_ds, val_ds, test_ds, k, hp_i, i, hp,
-            res_dir, fold_str, hp_str, verbose, log_dir_base,
-            custom_evaluator=custom_evaluator,
-            **config)
-          if single_hp is None:
-            pos_file.write_text(f"{k},{hp_i},{i}")
+          try:
+            completed_evaluation_step |= evaluation_step(
+              model_ctr, train_ds, val_ds, test_ds, k, hp_i, i, hp,
+              res_dir, fold_str, hp_str, verbose, log_dir_base,
+              custom_evaluator=custom_evaluator,
+              **config)
+            if single_hp is None:
+              pos_file.write_text(f"{k},{hp_i},{i}")
+          except Exception as e:
+            print(f"Error at fold {fold_str} with hp {hp_str}:")
+            print(hp)
+            raise e
 
       t_end_fold = timer()
       dur_fold = t_end_fold - t_start_fold

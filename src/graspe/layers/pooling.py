@@ -45,7 +45,7 @@ class SoftmaxPooling(keras.layers.Layer):
       X_att, graph_idx, num_segments=N)
     y = tf.math.unsorted_segment_sum(
       X, graph_idx, num_segments=N)
-    return y / y_att
+    return tf.math.divide_no_nan(y, y_att)
 
 def merge_attention(inputs):
   input, input_att = inputs

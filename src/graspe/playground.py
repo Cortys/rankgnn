@@ -43,7 +43,7 @@ def experiment(
   enc = encs[0]
   in_enc = enc[0]
   out_enc = enc[1]
-  dim = 64
+  dim = 32
   depth = 5
   fc_layer_args = None
 
@@ -69,13 +69,13 @@ def experiment(
     cmp_layer_units=[edim],
     activation="sigmoid", inner_activation="relu",
     # att_conv_activation="relu",
-    pooling="sum",
+    pooling="softmax",
     learning_rate=0.0001,
     # kernel="rbf",
     C=0.1)
   print("Instanciated model.")
   if provider.dataset_size < 10:
-    ds_train = provider.get(enc)
+    ds_train = provider.get(enc, config=config)
     ds_val, ds_test = ds_train, ds_train
     #  targets = provider.dataset[1]
   else:
@@ -110,6 +110,7 @@ def experiment(
   return m
 
 def sort_experiment(provider, model, **config):
+  print("Staring sort experiment...")
   bsl = 40000
   m = experiment(
     provider, model, batch_size_limit=bsl,
@@ -129,27 +130,24 @@ def sort_experiment(provider, model, **config):
 
 
 # provider = syn.triangle_classification_dataset()
-provider = syn.triangle_count_dataset()
+# provider = syn.triangle_count_dataset()
 # provider = syn.triangle_count_dataset(default_split="count_extrapolation")
 # provider = tu.ZINC_full(in_memory_cache=False)
 # provider = tu.TRIANGLES(in_memory_cache=False)
 # provider = ogb.Mollipo()
-# provider = ogb.Molesol()
+provider = ogb.Molfreesolv()
 
 # model = gnn.CmpGIN
 # model = gnn.DirectRankGIN
 # model = gnn.DirectRankWL2GNN
-model = gnn.WL2GNN
-# model = gnn.GIN
+# model = gnn.WL2GNN
+model = gnn.GIN
 # model = svm.KernelSVM
 # model = svm.SVM
 # model = nn.MLP
 
-print("no feats:")
+# print("no feats:")
 # m = sort_experiment(provider, model, epochs=1000, T=5, prefer_in_enc="wlst", ignore_node_features=True, nystroem=500)
-print()
-# print("with feats:")
-# sort_experiment(provider, model, epochs=1000, T=5, prefer_in_enc="wlst", ignore_node_features=False, nystroem=500)
-
-m = model(out_enc="float", conv_layer_units=[10], fc_layer_units=[10,1])
-m.enc
+# print()
+print("with feats:")
+sort_experiment(provider, model, epochs=1000, T=5, prefer_in_enc="wlst", ignore_node_features=False, nystroem=500)

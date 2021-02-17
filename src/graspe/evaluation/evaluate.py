@@ -45,21 +45,27 @@ def train(
   label = "_" + label if label is not None else ""
 
   t = time_str()
-  tb = keras.callbacks.TensorBoard(
-    log_dir=log_dir_base / f"{t}{label}/",
-    histogram_freq=10,
-    write_images=False)
-  es = keras.callbacks.EarlyStopping(
-    monitor="loss" if val_ds is None else "val_loss",
-    patience=patience,
-    min_delta=stopping_min_delta,
-    restore_best_weights=restore_best)
+  if isinstance(model, keras.Model):
+    tb = keras.callbacks.TensorBoard(
+      log_dir=log_dir_base / f"{t}{label}/",
+      histogram_freq=10,
+      write_images=False)
+    es = keras.callbacks.EarlyStopping(
+      monitor="loss" if val_ds is None else "val_loss",
+      patience=patience,
+      min_delta=stopping_min_delta,
+      restore_best_weights=restore_best)
 
-  if measure_epoch_times:
-    tc = EpochTimeCallback()
-    callbacks = [tb, es, tc]
+    if measure_epoch_times:
+      tc = EpochTimeCallback()
+      callbacks = [tb, es, tc]
+    else:
+      callbacks = [tb, es]
+
+    train_ds = train_ds.cache()
+    val_ds = val_ds.cache()
   else:
-    callbacks = [tb, es]
+    callbacks = []
 
   hist = model.fit(
     train_ds, validation_data=val_ds,
@@ -170,7 +176,7 @@ def evaluate(
   split=None, repeat=1, winner_repeat=3, epochs=2000,
   patience=100, stopping_min_delta=0.0001,
   restore_best=False, hp_args=None, label=None,
-  selection_metric="accuracy",
+  selection_metric="tau",
   eval_dir=None, verbose=2, dry=False, ignore_worst=0, single_hp=None):
   if ds_provider.default_split != 0 and split is None:
     split = ds_provider.default_split

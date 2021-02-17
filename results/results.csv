@@ -1,0 +1,8 @@
+id;model;params;isDefault;triangleTestMean;triangleTestStd;triangleTrainMean;triangleTrainStd;triangleBestTest;triangleBestTrain;molesolTestMean;molesolTestStd;molesolTrainMean;molesolTrainStd;molesolBestTest;molesolBestTrain;mollipoTestMean;mollipoTestStd;mollipoTrainMean;mollipoTrainStd;mollipoBestTest;mollipoBestTrain;molfreesolvTestMean;molfreesolvTestStd;molfreesolvTrainMean;molfreesolvTrainStd;molfreesolvBestTest;molfreesolvBestTrain;zincTestMean;zincTestStd;zincTrainMean;zincTrainStd;zincBestTest;zincBestTrain
+0;WL\textsubscript{ST};;1;0.291;0.000;0.230;0.000;0;0;0.566;0.000;0.664;0.000;0;0;0.339;0.000;0.450;0.000;0;0;0.153;0.000;0.505;0.000;0;0;m;m;m;m;0;0
+1;GIN;;1;0.469;0.056;0.456;0.081;0;0;0.729;0.005;0.811;0.013;0;0;0.353;0.052;0.451;0.091;1;1;0.243;0.125;0.748;0.069;0;1;t;t;t;t;0;0
+2;2-WL-GNN;;1;0.998;0.002;0.990;0.006;1;1;0.747;0.007;0.822;0.007;1;1;0.318;0.017;0.380;0.024;0;0;0.379;0.207;0.624;0.251;1;0;t;t;t;t;0;0
+3;DirectRankGIN;;1;0.502;0.028;0.589;0.011;0;0;0.712;0.007;0.799;0.004;1;0;0.429;0.026;0.545;0.023;1;1;0.439;0.065;0.749;0.056;0;0;t;t;t;t;0;0
+4;2-WL-DirectRankGNN;;1;1.000;0.000;1.000;0.000;1;1;0.699;0.016;0.810;0.012;0;1;0.300;0.302;0.392;0.336;0;0;0.525;0.010;0.869;0.023;1;1;t;t;t;t;0;0
+5;CmpGIN;;1;0.401;0.048;0.299;0.034;0;0;0.411;0.030;0.472;0.043;0;0;0.250;0.015;0.284;0.023;0;0;0.056;0.081;0.078;0.259;0;0;t;t;t;t;0;0
+6;2-WL-CmpGNN;;1;0.544;0.051;0.555;0.062;0;0;0.456;0.091;0.516;0.090;0;0;0.200;0.026;0.197;0.046;0;0;0.272;0.165;0.504;0.128;0;0;t;t;t;t;0;0

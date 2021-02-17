@@ -128,14 +128,18 @@ def summarize_evaluation(
     else:
       print(f"No results for {fold_i}.")
 
-  combined_train = dict_map(
-    statistics,
-    fy.merge_with(np.array, *map(
-      lambda res: dict_map(lambda t: t["mean"], res["train"]), results)))
-  combined_test = dict_map(
-    statistics,
-    fy.merge_with(np.array, *map(
-      lambda res: dict_map(lambda t: t["mean"], res["test"]), results)))
+  if len(results) == 1:
+    combined_train = results[0]["train"]
+    combined_test = results[0]["test"]
+  else:
+    combined_train = dict_map(
+      statistics,
+      fy.merge_with(np.array, *map(
+        lambda res: dict_map(lambda t: t["mean"], res["train"]), results)))
+    combined_test = dict_map(
+      statistics,
+      fy.merge_with(np.array, *map(
+        lambda res: dict_map(lambda t: t["mean"], res["test"]), results)))
 
   results_summary = {
     "folds": results,
@@ -144,7 +148,7 @@ def summarize_evaluation(
     "args": {
       "ignore_worst": ignore_worst
     },
-    "done": all_hps and len(folds) == 10
+    "done": all_hps and len(folds) == config["outer_k"]
   }
 
   cache_write(summary_dir / "results.json", results_summary, "pretty_json")

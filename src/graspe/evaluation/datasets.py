@@ -21,7 +21,9 @@ triangle_count = fy.partial(
 # TU:
 ZINC = fy.partial(
   tu.ZINC_full,
-  default_preprocess_config=random_preprocess_config)
+  default_preprocess_config={
+    **random_preprocess_config,
+    "batch_size_limit": 10000})
 
 # OGB:
 

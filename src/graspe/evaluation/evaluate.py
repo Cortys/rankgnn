@@ -264,6 +264,13 @@ def evaluate(
   if not log_dir_base.exists():
     os.makedirs(log_dir_base)
 
+  summ = summary.summarize_evaluation(
+    eval_dir, selection_metric=selection_metric, ignore_worst=ignore_worst)
+
+  if summ["done"]:
+    print(t, f"- Already evaluated {ds_name} using {mf_name}. Skipped.")
+    return
+
   k_start = 0
   hp_start = 0
   i_start = -1

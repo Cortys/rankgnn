@@ -13,7 +13,7 @@ import funcy as fy
 import tensorflow as tf
 
 from graspe.stats.utils import statistics
-from graspe.utils import tolerant, NumpyEncoder
+from graspe.utils import tolerant, NumpyEncoder, make_dir
 import graspe.models.sort as model_sort
 import graspe.evaluation.summary as summary
 
@@ -61,9 +61,6 @@ def train(
       callbacks = [tb, es, tc]
     else:
       callbacks = [tb, es]
-
-    train_ds = train_ds.cache()
-    val_ds = val_ds.cache()
   else:
     callbacks = []
 
@@ -79,7 +76,7 @@ def train(
 
 @tolerant
 def evaluation_step(
-  model_ctr, train_ds, val_ds, test_ds, k, hp_i, i, hp,
+  model_ctr, load_ds, k, hp_i, i, hp,
   res_dir, fold_str, hp_str, verbose, log_dir_base,
   epochs, patience, stopping_min_delta, restore_best,
   repeat, winner_repeat, pos_hp_i=None, custom_evaluator=None):
@@ -102,6 +99,7 @@ def evaluation_step(
 
   t_start = timer()
   model = model_ctr(**hp)
+  train_ds, val_ds, test_ds = load_ds()
   history = train(
     model, train_ds, val_ds, label,
     epochs=epochs, patience=patience,
@@ -120,6 +118,10 @@ def evaluation_step(
   train_res = dict(zip(model.metrics_names, train_res))
   val_res = dict(zip(model.metrics_names, val_res))
   test_res = dict(zip(model.metrics_names, test_res))
+  train_ds = None
+  val_ds = None
+  test_ds = None
+  gc.collect()
 
   if custom_evaluator is not None:
     train_cust, val_cust, test_cust = custom_evaluator(model)
@@ -177,7 +179,8 @@ def evaluate(
   patience=100, stopping_min_delta=0.0001,
   restore_best=False, hp_args=None, label=None,
   selection_metric="tau",
-  eval_dir=None, verbose=2, dry=False, ignore_worst=0, single_hp=None):
+  eval_dir=None, verbose=2, dry=False, ignore_worst=0, single_hp=None,
+  ds_cache=True):
   if ds_provider.default_split != 0 and split is None:
     split = ds_provider.default_split
 
@@ -209,8 +212,7 @@ def evaluate(
   t = time_str()
   if eval_dir is None:
     eval_dir = find_eval_dir(model_factory, ds_provider, label, split)
-    if not eval_dir.exists():
-      os.makedirs(eval_dir)
+    make_dir(eval_dir)
 
     with open(eval_dir / "config.json", "w") as f:
       config = {
@@ -258,18 +260,8 @@ def evaluate(
   res_dir = eval_dir / "results"
   pos_file = eval_dir / "state.txt"
 
-  if not res_dir.exists():
-    os.makedirs(res_dir)
-
-  if not log_dir_base.exists():
-    os.makedirs(log_dir_base)
-
-  summ = summary.summarize_evaluation(
-    eval_dir, selection_metric=selection_metric, ignore_worst=ignore_worst)
-
-  if summ["done"]:
-    print(t, f"- Already evaluated {ds_name} using {mf_name}. Skipped.")
-    return
+  make_dir(res_dir)
+  make_dir(log_dir_base)
 
   k_start = 0
   hp_start = 0
@@ -308,6 +300,13 @@ def evaluate(
     print(f"Completed dry evaluation of {ds_name} using {mf_name}.")
     return
 
+  summ = summary.summarize_evaluation(
+    eval_dir, selection_metric=selection_metric, ignore_worst=ignore_worst)
+
+  if summ["done"]:
+    print(t, f"- Already evaluated {ds_name} using {mf_name}. Skipped.")
+    return
+
   t_start_eval = timer()
   completed_evaluation_step = False
   try:
@@ -322,14 +321,29 @@ def evaluate(
         outer_idx = None
       else:
         outer_idx = split
-      train_ds, val_ds, test_ds = ds_provider.get_split(
-        enc, outer_idx=outer_idx, config=ds_config)
-      custom_evaluator = sort_evaluator(
-        ds_provider, enc, outer_idx, **ds_config)
 
-      if train_ds is None or test_ds is None:
-        print(time_str(), f"- Data of fold {fold_str} could not be loaded.")
-        continue
+      def load_ds():
+        train_ds, val_ds, test_ds = ds_provider.get_split(
+          enc, outer_idx=outer_idx, config=ds_config)
+
+        if enc[-1] == "tf":
+          train_ds = train_ds.cache()
+          val_ds = val_ds.cache()
+        return train_ds, val_ds, test_ds
+
+      load_evaluator = lambda model: sort_evaluator(
+        ds_provider, enc, outer_idx, **ds_config)(model)
+
+      if ds_cache:
+        train_ds, val_ds, test_ds = load_ds()
+
+        if train_ds is None or test_ds is None:
+          print(time_str(), f"- Data of fold {fold_str} could not be loaded.")
+          continue
+        custom_evaluator = sort_evaluator(
+          ds_provider, enc, outer_idx, **ds_config)
+        load_ds = lambda: (train_ds, val_ds, test_ds)
+        load_evaluator = lambda model: custom_evaluator(model)
 
       for hp_i, hp in enumerate(hps):
         hp_str = f"{hp_i+1}/{hpc}"
@@ -354,9 +368,9 @@ def evaluate(
         for i in range(curr_i_start, repeat):
           try:
             completed_evaluation_step |= evaluation_step(
-              model_ctr, train_ds, val_ds, test_ds, k, hp_i, i, hp,
+              model_ctr, load_ds, k, hp_i, i, hp,
               res_dir, fold_str, hp_str, verbose, log_dir_base,
-              custom_evaluator=custom_evaluator,
+              custom_evaluator=load_evaluator,
               **config)
             if single_hp is None:
               pos_file.write_text(f"{k},{hp_i},{i}")
@@ -388,9 +402,9 @@ def evaluate(
 
           for i in range(repeat, winner_repeat):
             completed_evaluation_step = evaluation_step(
-              model_ctr, train_ds, val_ds, test_ds, k, best_hp_i, i, best_hp,
+              model_ctr, load_ds, k, best_hp_i, i, best_hp,
               res_dir, fold_str, hp_str, verbose, log_dir_base,
-              custom_evaluator=custom_evaluator,
+              custom_evaluator=load_evaluator,
               **config)
             if single_hp is None:
               pos_file.write_text(f"{k},{hpc},{i}")

@@ -132,16 +132,16 @@ def sort_experiment(provider, model, **config):
 # provider = syn.triangle_classification_dataset()
 # provider = syn.triangle_count_dataset()
 # provider = syn.triangle_count_dataset(default_split="count_extrapolation")
-# provider = tu.ZINC_full(in_memory_cache=False)
+provider = tu.ZINC_full(in_memory_cache=False)
 # provider = tu.TRIANGLES(in_memory_cache=False)
 # provider = ogb.Mollipo()
-provider = ogb.Molfreesolv()
+# provider = ogb.Molfreesolv()
 
 # model = gnn.CmpGIN
-# model = gnn.DirectRankGIN
+model = gnn.DirectRankGIN
 # model = gnn.DirectRankWL2GNN
 # model = gnn.WL2GNN
-model = gnn.GIN
+# model = gnn.GIN
 # model = svm.KernelSVM
 # model = svm.SVM
 # model = nn.MLP

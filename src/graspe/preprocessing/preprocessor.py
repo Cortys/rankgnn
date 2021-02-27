@@ -282,6 +282,16 @@ class DefaultPreprocessor(Preprocessor):
   in_encoder_gen = lambda: encoder.ObjectEncoder.identity
   out_encoder_gen = in_encoder_gen
 
+class InDefaultPreprocessor(Preprocessor):
+  preprocessed_cacheable = True
+  in_encoder_gen = lambda: encoder.ObjectEncoder.identity
+  out_encoder_gen = lambda: encoder.NullEncoder.identity
+
+class OutDefaultPreprocessor(Preprocessor):
+  preprocessed_cacheable = True
+  in_encoder_gen = lambda: encoder.NullEncoder.identity
+  out_encoder_gen = lambda: encoder.Encoder.identity
+
 
 preprocessors = defaultdict(dict)
 
@@ -298,5 +308,9 @@ def find_encodings(type):
 def find_preprocessor(type, enc):
   if enc is None:
     return DefaultPreprocessor
-
-  return preprocessors[type][enc]
+  elif enc == "null_out":
+    return InDefaultPreprocessor
+  elif enc == "null_in":
+    return OutDefaultPreprocessor
+  else:
+    return preprocessors[type][enc]

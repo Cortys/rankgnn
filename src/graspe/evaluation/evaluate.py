@@ -177,7 +177,7 @@ def evaluate(
   model_factory, ds_provider,
   split=None, repeat=1, winner_repeat=3, epochs=2000,
   patience=100, stopping_min_delta=0.0001,
-  restore_best=False, hp_args=None, label=None,
+  restore_best=True, hp_args=None, label=None,
   selection_metric="tau",
   eval_dir=None, verbose=2, dry=False, ignore_worst=0, single_hp=None,
   ds_cache=True):

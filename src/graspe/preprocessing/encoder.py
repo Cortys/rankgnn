@@ -49,6 +49,21 @@ class ObjectEncoder(Encoder):
 
     return utils.obj_array(elements)
 
+class NullEncoder(Encoder):
+  name = "null"
+
+  def _make_slicable(self, elements):
+    return None
+
+  def slice_raw(self, elements, indices):
+    return None
+
+  def slice_encoded(self, elements, indices, train_indices=None):
+    return None
+
+  def transform(self, elements, train_metadata=None):
+    return None
+
 class TupleEncoder(transformer.TupleTransformer, Encoder):
   def __init__(self, *encoders, size=2):
     can_slice_raw = True
@@ -86,3 +101,4 @@ class TupleEncoder(transformer.TupleTransformer, Encoder):
 
 transformer.register_transformer(Encoder, TupleEncoder)
 ObjectEncoder.identity = ObjectEncoder()
+NullEncoder.identity = NullEncoder()

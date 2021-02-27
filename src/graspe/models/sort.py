@@ -81,7 +81,8 @@ def evaluate_model_sort(indices, provider_get, model=None, enc=None, **config):
   out_enc = enc[1]
 
   print("Loading target rankings...")
-  _, object_rankings = provider_get(indices=indices, config=config)
+  _, object_rankings = provider_get(
+    enc="null_in", indices=indices, config=config)
   print(f"Loaded {len(object_rankings)} target rankings.")
 
   if "pref" in in_enc:

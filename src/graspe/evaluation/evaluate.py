@@ -335,6 +335,7 @@ def evaluate(
         ds_provider, enc, outer_idx, **ds_config)(model)
 
       if ds_cache:
+        print(time_str(), f"- Preloading fold {fold_str}.")
         train_ds, val_ds, test_ds = load_ds()
 
         if train_ds is None or test_ds is None:
@@ -344,12 +345,14 @@ def evaluate(
           ds_provider, enc, outer_idx, **ds_config)
         load_ds = lambda: (train_ds, val_ds, test_ds)
         load_evaluator = lambda model: custom_evaluator(model)
+      else:
+        print(time_str(), f"- Note that fold {fold_str} will not be cached.")
 
       for hp_i, hp in enumerate(hps):
         hp_str = f"{hp_i+1}/{hpc}"
         curr_i_start = 0
 
-        if single_hp is not None and single_hp != hp_i:
+        if single_hp is not None and hp_i not in single_hp:
           print(f"Skipping {fold_str} with hp {hp_str} due to single hp mode.")
           continue
 
@@ -386,7 +389,7 @@ def evaluate(
       print(time_str(), f"- Evaluated hps of fold {fold_str} in {dur_fold}s.")
 
       if winner_repeat > repeat:
-        if single_hp is not None:
+        if single_hp is not None and "repeat" not in single_hp:
           print(f"No repeats because of single hp mode for hp={single_hp}.")
         elif hp_start == hpc and i_start + 1 == winner_repeat:
           print(f"Already did winner evaluations of fold {fold_str}.")

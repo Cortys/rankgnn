@@ -24,8 +24,8 @@ ZINC = fy.partial(
   in_memory_cache=False,
   default_preprocess_config={
     **random_preprocess_config,
-    "batch_size_limit": 5000,
-    "sample_ratio": 1.5})
+    "batch_size_limit": 2000,
+    "sample_ratio": 3})
 
 # OGB:
 

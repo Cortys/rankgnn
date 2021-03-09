@@ -1,4 +1,5 @@
 import argparse
+import ast
 import funcy as fy
 
 import graspe.evaluation.evaluate as evaluate
@@ -52,6 +53,9 @@ if __name__ == "__main__":
   parser.add_argument(
     "--dry", action="store_true",
     help="Only generate eval metadata without starting evaluation steps.")
+  parser.add_argument(
+    "-c", "--config", action="append",
+    help="Set additional eval configs.")
   args = parser.parse_args()
 
   type = "evaluation"
@@ -91,6 +95,8 @@ if __name__ == "__main__":
   else:
     ms = args.model
 
+  config = {}
+
   dsl = len(ds)
   msl = len(ms)
 
@@ -101,6 +107,18 @@ if __name__ == "__main__":
   print(f"Will use the following {msl} models:")
   for m in ms:
     print(f"- {m}")
+
+  if args.config is not None and len(args.config) > 0:
+    for cs in args.config:
+      cs_split = cs.split("=", 1)
+      if len(cs_split) == 2:
+        k, v = cs_split
+        config[k] = ast.literal_eval(v)
+      else:
+        config[cs] = True
+
+    print("Will use the following custom config:")
+    print(config)
 
   print()
   while True:
@@ -118,19 +136,21 @@ if __name__ == "__main__":
   print("----------------------------------------------------------\n")
 
   for m in ms:
-    split_m = m.split("?", 1)
+    split_m = m.split("?")
 
-    if len(split_m) == 2:
-      m, hp_i = split_m
-      hp_i = int(hp_i)  # Evaluate only a single hp.
+    if len(split_m) > 1:
+      m = split_m[0]
+      # Evaluate only the given hps:
+      hp_is = set(
+        int(hp_i) if hp_i.isdigit() else hp_i for hp_i in split_m[1:])
     else:
-      hp_i = None  # Evaluate all hps.
+      hp_is = None  # Evaluate all hps.
 
     model = getattr(models, m)
     for d in ds:
       dsm = getattr(datasets, d)
       print(f"- Model: {m}, Dataset: {d}. -")
-      f(model, dsm(), single_hp=hp_i)
+      f(model, dsm(), single_hp=hp_is, **config)
       print("\n----------------------------------------------------------\n")
 
   print(f"Grid evaluation (# datasets = {dsl}, # models = {msl}) completed.")

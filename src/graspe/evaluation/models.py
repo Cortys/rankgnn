@@ -108,6 +108,17 @@ def default_nn_hyperparams(
 def default_svm_hyperparams():
   return cart(C=[1, 0.1, 0.01, 0.001, 0.0001])
 
+@model_factory(gnn.GCN)
+def GCN(enc, in_meta, out_meta):
+  return default_gnn_hyperparams(enc)
+
+@model_factory(gnn.DirectRankGCN, )
+def DirectRankGCN(enc, in_meta, out_meta):
+  return default_gnn_hyperparams(enc)
+
+@model_factory(gnn.CmpGCN)
+def CmpGCN(enc, in_meta, out_meta):
+  return default_gnn_hyperparams(enc)
 
 @model_factory(gnn.GIN)
 def GIN(enc, in_meta, out_meta):

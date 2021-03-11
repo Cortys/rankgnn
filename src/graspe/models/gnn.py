@@ -49,6 +49,15 @@ def index_selector(idx):
   return selector
 
 
+GCN = ck.create_model("GCN", [
+  inputs,
+  cm.with_layer(wl1.GCNPreprocessLayer),
+  graph_embed(wl1.GCNLayer),
+  cm.with_layers(Dense, prefix="fc"),
+  finalize],
+  input_encodings=["wl1"],
+  output_encodings=tf_enc.output_encodings)
+
 GIN = ck.create_model("GIN", [
   inputs,
   graph_embed(wl1.GINLayer),
@@ -65,9 +74,10 @@ WL2GNN = ck.create_model("WL2GNN", [
   input_encodings=["wl2"],
   output_encodings=tf_enc.output_encodings)
 
-def createDirectRankGNN(name, gnnLayer, enc):
+def createDirectRankGNN(name, gnnLayer, enc, prepend=()):
   return ck.create_model(name, [
     inputs,
+    *prepend,
     ([graph_embed(gnnLayer),
       cm.with_layers(Dense, prefix="fc")],
      index_selector("pref_a"), index_selector("pref_b")),
@@ -79,9 +89,10 @@ def createDirectRankGNN(name, gnnLayer, enc):
     input_encodings=[f"{enc}_pref"],
     output_encodings=["binary"])
 
-def createCmpGNN(name, gnnLayer, enc):
+def createCmpGNN(name, gnnLayer, enc, prepend=()):
   return ck.create_model(name, [
     inputs,
+    *prepend,
     ([graph_embed(gnnLayer),
       cm.with_layers(Dense, prefix="fc")],
      index_selector("pref_a"), index_selector("pref_b")),
@@ -95,7 +106,13 @@ def createCmpGNN(name, gnnLayer, enc):
     output_encodings=["binary"])
 
 
+DirectRankGCN = createDirectRankGNN(
+  "DirectRankGCN",
+  wl1.GCNLayer, "wl1", [cm.with_layer(wl1.GCNPreprocessLayer)])
 DirectRankGIN = createDirectRankGNN("DirectRankGIN", wl1.GINLayer, "wl1")
 DirectRankWL2GNN = createDirectRankGNN("DirectRankWL2GNN", wl2.WL2Layer, "wl2")
+
+CmpGCN = createCmpGNN(
+  "CmpGCN", wl1.GCNLayer, "wl1", [cm.with_layer(wl1.GCNPreprocessLayer)])
 CmpGIN = createCmpGNN("CmpGIN", wl1.GINLayer, "wl1")
 CmpWL2GNN = createCmpGNN("CmpWL2GNN", wl2.WL2Layer, "wl2")

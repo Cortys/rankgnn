@@ -29,6 +29,7 @@
 (def mean-pool "\\mean")
 (def sam-pool (if include-lta "\\mathrm{SAM}" "\\wmean"))
 (def models-with-potential-oom #{wlst-model})
+(def use-incomplete #{["ZINC_full_tu", "DirectRankWL2GNN"]})
 
 (defn round
   ([num] (round num 0))
@@ -108,42 +109,57 @@
         time-eval (some? time-eval)]
     (condp #(str/includes? %2 %1) n
       ; pair:
+      "DirectRankGCN"
+      {:name "DirectRankGCN" :order [1 0 0]
+       :pool ""
+       :time-eval time-eval
+       :is-default true}
       "DirectRankGIN"
-      {:name "DirectRankGIN" :order [1 0 0]
+      {:name "DirectRankGIN" :order [1 1 0]
        :pool ""
        :time-eval time-eval
        :is-default true}
       "DirectRankWL2GNN"
-      {:name "2-WL-DirectRankGNN" :order [1 1 r]
+      {:name "2-WL-DirectRankGNN" :order [1 2 r]
+       :pool ""
+       :time-eval time-eval
+       :is-default true}
+      "CmpGCN"
+      {:name "CmpGCN" :order [1 3 0]
        :pool ""
        :time-eval time-eval
        :is-default true}
       "CmpGIN"
-      {:name "CmpGIN" :order [1 2 0]
+      {:name "CmpGIN" :order [1 4 0]
        :pool ""
        :time-eval time-eval
        :is-default true}
       "CmpWL2GNN"
-      {:name "2-WL-CmpGNN" :order [1 3 r]
+      {:name "2-WL-CmpGNN" :order [1 5 r]
        :pool ""
        :time-eval time-eval
        :is-default true}
       ; point:
-      "WL_st"
-      {:name wlst-model
-       :order [0 0 (or T 5)]
-       :it (str "T=" (or T 5))
-       :T (or T 5)
-       :is-default true ; (or (= T 1) (= T 3))
-       :hide-diff (= T 1)}
+      ; "WL_st"
+      ; {:name wlst-model
+      ;  :order [0 0 (or T 5)]
+      ;  :it (str "T=" (or T 5))
+      ;  :T (or T 5)
+      ;  :is-default true ; (or (= T 1) (= T 3))
+      ;  :hide-diff (= T 1)}
+      "GCN"
+      {:name "GCN" :order [0 1 0]
+       :pool ""
+       :time-eval time-eval
+       :is-default true}
       "GIN"
-      {:name "GIN" :order [0 1 0]
+      {:name "GIN" :order [0 2 0]
        :pool ""
        :time-eval time-eval
        :is-default true}
       "WL2GNN"
       {:name "2-WL-GNN"
-       :order [0 2 r]
+       :order [0 3 r]
        :r r
        :is-default (= r (single-depth-radii dataset))
        :time-eval time-eval
@@ -180,7 +196,7 @@
                                           {test :tau} :combined_test
                                           {train :tau} :combined_train
                                           done :done}]
-                                      (when done
+                                      (when (or done (use-incomplete [dataset name]))
                                         {:name name
                                          :config config
                                          :test-mean (to-proc (:mean test))

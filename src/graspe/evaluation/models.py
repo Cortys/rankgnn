@@ -63,6 +63,7 @@ def default_gnn_hyperparams(
     att_conv_activation=["sigmoid"],
     fc_activation=["sigmoid"],
     fc_layer_args=fc_layer_args,
+    cmp_activation=["sigmoid"],
     conv_use_bias=[True],
     fc_use_bias=[True],
     pooling=pooling,

@@ -33,6 +33,15 @@ class PrefQuotientLayer(keras.layers.Layer):
 
     return tf.math.divide_no_nan(X_a, X_a + X_b)
 
+class PrefSigmoidDiffLayer(keras.layers.Layer):
+  def __init__(self):
+    super().__init__()
+
+  def call(self, input):
+    X_a, X_b = input
+
+    return tf.sigmoid(X_b - X_a)
+
 class CmpLayer(keras.layers.Layer):
   def __init__(self, units, use_bias=True, activation=None):
     super().__init__()

@@ -4,12 +4,12 @@
          '[cheshire.core :as json]
          '[clojure.java.shell :refer [sh]])
 
-(def include-lta true)
+#_(def include-lta true)
 
 (def default-radii (constantly 1))
 (def single-depth-radii default-radii)
-(def default-iterations {"WL_st_SVM" 5
-                         "WL_sp_SVM" 5})
+#_(def default-iterations {"WL_st_SVM" 5
+                           "WL_sp_SVM" 5})
 (def ds-rename {"triangle_count_dataset" "TRIANGLES"
                 "ogbg-molesol_ogb" "molesol"
                 "ogbg-mollipo_ogb" "mollipo"
@@ -26,8 +26,8 @@
                "ogbg-molfreesolv_ogb"
                "ZINC_full_tu"])
 (def wlst-model "WL\\textsubscript{ST}")
-(def mean-pool "\\mean")
-(def sam-pool (if include-lta "\\mathrm{SAM}" "\\wmean"))
+#_(def mean-pool "\\mean")
+#_(def sam-pool (if include-lta "\\mathrm{SAM}" "\\wmean"))
 (def models-with-potential-oom #{wlst-model})
 (def use-incomplete #{["ZINC_full_tu", "DirectRankWL2GNN"]})
 
@@ -84,43 +84,43 @@
                   "graph_count,"
                   "node_count_min,node_count_mean,node_count_max,"
                   "edge_count_min,edge_count_mean,edge_count_max,"
-                  "dim_node_features,dim_edge_features,",
+                  "dim_node_features,dim_edge_features,"
                   "node_degree_min,node_degree_mean,node_degree_std,node_degree_max,"
                   "radius_mean,radius_std")
         stats (str head "\n" (str/join "\n" (map stats-dict->csv-line stats)) "\n")]
     (spit "./results/ds_stats.csv" stats)
     (println stats)))
 
-(defn extract-pool
-  [name]
-  (let [pool (if (str/includes? name "Avg") mean-pool sam-pool)]
-    pool
-    #_(if (str/ends-with? name "FC")
-        (str pool " + \\mathrm{MLP}")
-        pool)))
+#_(defn extract-pool
+    [name]
+    (let [pool (if (str/includes? name "Avg") mean-pool sam-pool)]
+      pool
+      #_(if (str/ends-with? name "FC")
+          (str pool " + \\mathrm{MLP}")
+          pool)))
 
 (defn eval-name->params
   [dataset name]
   (let [[_ r n _ T time-eval] (re-find #"n?(\d?)_?(.+?)(_FC)?(_\d)?(_time_eval)?$" name)
         ;_ (println "y" name dataset r n T)
         r (if (seq r) (Integer/parseInt r) (default-radii dataset))
-        T (when (seq T) (Integer/parseInt (subs T 1)))
+        _ (when (seq T) (Integer/parseInt (subs T 1)))
         ; pool (extract-pool name)
         time-eval (some? time-eval)]
     (condp #(str/includes? %2 %1) n
       ; pair:
       "DirectRankGCN"
-      {:name "DirectRankGCN" :order [1 0 0]
+      {:name "DrGCN" :order [1 0 0]
        :pool ""
        :time-eval time-eval
        :is-default true}
       "DirectRankGIN"
-      {:name "DirectRankGIN" :order [1 1 0]
+      {:name "DrGIN" :order [1 1 0]
        :pool ""
        :time-eval time-eval
        :is-default true}
       "DirectRankWL2GNN"
-      {:name "2-WL-DirectRankGNN" :order [1 2 r]
+      {:name "2-WL-DrGNN" :order [1 2 r]
        :pool ""
        :time-eval time-eval
        :is-default true}
@@ -180,7 +180,9 @@
   [dataset & {:keys [only-default] :or {only-default true}}]
   (let [evals (ls-dir "./evaluations/")
         summaries (into []
-                        (comp (filter #(and (str/starts-with? % dataset) (not (str/ends-with? % "quick"))))
+                        (comp (filter #(and (str/starts-with? % dataset)
+                                            (not (str/ends-with? % "quick"))
+                                            (not (str/includes? % "extrapolation"))))
                               (map (juxt identity #(try
                                                      [(slurp (str "./evaluations/" % "/summary/results.json"))
                                                       (slurp (str "./evaluations/" % "/config.json"))]
@@ -230,7 +232,7 @@
                                       :is-best-test (= (max-test (max-grouper res)) (:test-mean res))
                                       :is-best-train (= (max-train (max-grouper res)) (:train-mean res))))
                      results)]
-      results))
+    results))
 
 (defn dataset-result-head
   [dataset & {with-best :with-best :or {with-best true}}]
@@ -271,17 +273,17 @@
     (spit (str "./results/" file ".csv") csv)
     (println csv)))
 
-(defn mean
-  [vals]
-  (/ (apply + vals) (count vals)))
+#_(defn mean
+    [vals]
+    (/ (apply + vals) (count vals)))
 
-(defn std
-  [vals]
-  (let [m (mean vals)]
-    [m (Math/sqrt
-         (/ (apply + (map (comp #(* % %) #(- % m))
-                          vals))
-            (count vals)))]))
+#_(defn std
+    [vals]
+    (let [m (mean vals)]
+      [m (Math/sqrt
+          (/ (apply + (map (comp #(* % %) #(- % m))
+                           vals))
+             (count vals)))]))
 
 (defn default-action
   []

@@ -18,6 +18,18 @@ triangle_count = fy.partial(
   outer_k=1,
   default_preprocess_config=base_preprocess_config)
 
+triangle_count_size_extra = fy.partial(
+  syn.triangle_count_dataset,
+  outer_k=1,
+  default_preprocess_config=base_preprocess_config,
+  default_split="size_extrapolation")
+
+triangle_count_count_extra = fy.partial(
+  syn.triangle_count_dataset,
+  outer_k=1,
+  default_preprocess_config=base_preprocess_config,
+  default_split="count_extrapolation")
+
 # TU:
 ZINC = fy.partial(
   tu.ZINC_full,

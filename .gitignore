@@ -14,10 +14,11 @@ nomis-ns-graph.png
 .rebl
 
 
+.vscode
 .ipynb_checkpoints
 __pycache__
 /JUPYTER_TOKEN
 /logs*
 /data*
 /raw*
-/evaluations*
+/*evaluations*

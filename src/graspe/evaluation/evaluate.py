@@ -436,13 +436,19 @@ def evaluate(
     f"- Evaluation of {ds_name} using {mf_name} completed in {dur_eval}s.",
     "No steps were executed." if not completed_evaluation_step else "")
 
-def resume_evaluation(model_factory, ds_provider, eval_dir=None, **kwargs):
+def resume_evaluation(
+  model_factory, ds_provider, eval_dir=None, split=None, label=None,
+  **kwargs):
+  if ds_provider.default_split != 0 and split is None:
+    split = ds_provider.default_split
+
   if eval_dir is None:
-    eval_dir = find_eval_dir(model_factory, ds_provider)
+    eval_dir = find_eval_dir(model_factory, ds_provider, label, split)
 
   if not (eval_dir / "config.json").exists():
     print(f"Starting new evaluation at {eval_dir}...")
-    return evaluate(model_factory, ds_provider, **kwargs)
+    return evaluate(
+      model_factory, ds_provider, label=label, split=split, **kwargs)
 
   print(f"Resuming evaluation at {eval_dir}...")
 

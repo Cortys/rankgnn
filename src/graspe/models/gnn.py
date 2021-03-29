@@ -100,7 +100,7 @@ def createCmpGNN(name, gnnLayer, enc, prepend=()):
     cm.with_layer(pref.PrefLookupLayer),
     cm.with_layers(pref.CmpLayer, prefix="cmp"),
     cm.with_layer(pref.CmpLayer, units=1, prefix="cmp"),
-    cm.with_layer(pref.PrefQuotientLayer),
+    cm.with_layer(pref.PrefSigmoidDiffLayer),
     finalize],
     input_encodings=[f"{enc}_pref"],
     output_encodings=["binary"])

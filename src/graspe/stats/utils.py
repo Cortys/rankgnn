@@ -62,3 +62,6 @@ def find_stat_computer(type):
       for t, v in zip(type, vals))
 
   return stat_computer.get(type, general_computer)
+
+def normalize(a):
+  return (a.astype('float64') - np.min(a)) / np.ptp(a)

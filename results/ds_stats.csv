@@ -1,0 +1,6 @@
+name,graph_count,node_count_min,node_count_mean,node_count_max,edge_count_min,edge_count_mean,edge_count_max,dim_node_features,dim_edge_features,node_degree_min,node_degree_mean,node_degree_std,node_degree_max,radius_mean,radius_std,triangles_min,triangles_mean,triangles_std,triangles_max
+TRIANGLES,778,3,43.1,85,2,58.4,162,0,0,1,2.7,1.7,11,3.3,1.0,0,3.8,2.7,9
+molesol,1128,1,13.3,55,0,13.7,62,9,3,0,2.1,0.8,4,3.9,1.6,0,0.0,0.1,1
+mollipo,4200,7,27.0,115,7,29.5,118,9,3,0,2.2,0.7,4,7.2,2.0,0,0.1,0.2,2
+molfreesolv,642,1,8.7,24,0,8.4,25,9,3,0,1.9,0.8,4,2.9,1.1,0,0.0,0.1,1
+ZINC,249456,6,23.2,38,5,24.9,45,28,3,1,2.2,0.7,5,6.5,1.3,0,0.1,0.3,3

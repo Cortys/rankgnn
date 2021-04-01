@@ -75,19 +75,33 @@ WL2GNN = ck.create_model("WL2GNN", [
   output_encodings=tf_enc.output_encodings)
 
 def createDirectRankGNN(name, gnnLayer, enc, prepend=()):
-  return ck.create_model(name, [
+  top = [
     inputs,
     *prepend,
     ([graph_embed(gnnLayer),
       cm.with_layers(Dense, prefix="fc")],
      index_selector("pref_a"), index_selector("pref_b")),
     cm.merge_ios,
-    cm.with_layer(pref.PrefLookupLayer),
+    cm.with_layer(pref.PrefLookupLayer)]
+
+  dr = ck.create_model(name, [
+    *top,
     cm.with_layer(pref.PrefDiffLayer),
     cm.with_layer(Dense, units=1, activation="sigmoid", use_bias=False),
     finalize],
     input_encodings=[f"{enc}_pref"],
     output_encodings=["binary"])
+
+  # For debugging and analysis purposes:
+  dr.decomposed = ck.create_model(name, [
+    *top,
+    cm.with_layer(pref.PrefFirstLayer),
+    cm.with_layer(Dense, units=1, activation=None, use_bias=False),
+    finalize],
+    input_encodings=[f"{enc}_pref"],
+    output_encodings=["binary"])
+
+  return dr
 
 def createCmpGNN(name, gnnLayer, enc, prepend=()):
   return ck.create_model(name, [

@@ -12,11 +12,9 @@ def quick_run(mf, dsm, **kwargs):
   evaluate.quick_evaluate(mf, dsm, **kwargs)
 
 def run(mf, dsm, **kwargs):
-
   evaluate.evaluate(mf, dsm,  **kwargs)
 
 def resume(mf, dsm, **kwargs):
-
   return evaluate.resume_evaluation(mf, dsm, **kwargs)
 
 def summarize(mf, dsm, **kwargs):
@@ -28,9 +26,8 @@ def summarize(mf, dsm, **kwargs):
   return summary.summarize_evaluation(
     evaluate.find_eval_dir(mf, dsm, split=split))
 
-def epoch_times(mf, dsm, **kwargs):
-  return evaluate.evaluate_epoch_time(mf, dsm)
-
+def rankings(mf, dsm, **kwargs):
+  return evaluate.ranking_util_evaluate(mf, dsm, **kwargs)
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(
@@ -45,11 +42,11 @@ if __name__ == "__main__":
     "-q", "--quick", action="store_true",
     help="Only do a quick run to check whether there might be OOM issues.")
   parser.add_argument(
-    "-t", "--time", action="store_true",
-    help="Only measure the epoch times of the first hp config.")
-  parser.add_argument(
     "-s", "--summarize", action="store_true",
     help="Only run the summarizer on existing evaluations.")
+  parser.add_argument(
+    "-r", "--rankings", action="store_true",
+    help="Compute target/predicted rank utility curves.")
   parser.add_argument(
     "--dry", action="store_true",
     help="Only generate eval metadata without starting evaluation steps.")
@@ -67,9 +64,9 @@ if __name__ == "__main__":
   elif args.summarize:
     type = "summarization"
     f = summarize
-  elif args.time:
-    type = "epoch time measurement"
-    f = epoch_times
+  elif args.rankings:
+    type = "rankings"
+    f = rankings
   elif args.dry:
     type = "dry evaluation"
     f = fy.partial(resume, dry=True)

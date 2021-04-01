@@ -125,6 +125,7 @@ def summarize_evaluation(
 
     if best_res is not None:
       results.append(best_res)
+      all_hps = all_hps and best_res["eval_repeats"] >= config["winner_repeat"]
     else:
       print(f"No results for {fold_i}.")
 

@@ -25,79 +25,97 @@
                "ogbg-mollipo_ogb"
                "ogbg-molfreesolv_ogb"
                "ZINC_full_tu"])
+(def ds-stats {"triangle_count_dataset" "data/synthetic/triangle_count_dataset/triangle_count_dataset_stats.json"
+               "ogbg-molesol_ogb" "data/ogb/ogbg-molesol/ogbg-molesol_stats.json"
+               "ogbg-mollipo_ogb" "data/ogb/ogbg-mollipo/ogbg-mollipo_stats.json"
+               "ogbg-molfreesolv_ogb" "data/ogb/ogbg-molfreesolv/ogbg-molfreesolv_stats.json"
+               "ZINC_full_tu" "data/tu/ZINC_full/ZINC_full_stats.json"})
+
 (def wlst-model "WL\\textsubscript{ST}")
 #_(def mean-pool "\\mean")
 #_(def sam-pool (if include-lta "\\mathrm{SAM}" "\\wmean"))
 (def models-with-potential-oom #{wlst-model})
-(def use-incomplete #{["ZINC_full_tu", "DirectRankWL2GNN"]})
+(def use-incomplete #{["ZINC_full_tu", "DirectRankWL2GNN"]
+                      ["ZINC_full_tu" "CmpGCN"]
+                      ["ZINC_full_tu" "CmpGIN"]
+                      ["ZINC_full_tu" "CmpWL2GNN"]
+                      ["triangle_count_dataset" "DirectRankWL2GNN"]
+                      ["triangle_count_dataset" "CmpWL2GNN"]})
 
 (defn round
   ([num] (round num 0))
   ([num prec]
-   (if (int? num)
-     num
-     (if (zero? prec)
-       (int (Math/round num))
-       (let [p (Math/pow 10 prec)
-             rounded (/ (Math/round (* num p)) p)]
-         (if (pos? prec)
-           rounded
-           (int rounded)))))))
+   (when (some? num)
+     (if (int? num)
+       num
+       (if (zero? prec)
+         (int (Math/round num))
+         (let [p (Math/pow 10 prec)
+               rounded (/ (Math/round (* num p)) p)]
+           (if (pos? prec)
+             rounded
+             (int rounded))))))))
 
 (defn dim-str
   [feat lab]
   (if (zero? (+ feat lab))
-    "0 + 1"
-    (str feat " + " lab)))
+    0 ; "0 + 1"
+    (+ feat lab))) ; (str feat " + " lab)))
 
 (defn stats-dict->csv-line
-  [[name {:strs [node_counts
-                 edge_counts
-                 dim_node_features
-                 dim_edge_features
-                 num_node_labels
-                 num_edge_labels
-                 node_degrees
-                 radii]}]]
+  [[name {size "size"
+          {{:strs [node_counts
+                   edge_counts
+                   node_degrees
+                   radii
+                   triangles]} "all"} "in"
+          {:strs [node_feature_dim
+                  edge_feature_dim
+                  node_label_count
+                  edge_label_count]} "in_meta"}]]
   (str/join ","
             [(ds-rename name name)
-             (get node_counts "count") ; graph count
+             size ; graph count
              (round (get node_counts "min"))
              (round (get node_counts "mean") 1)
              (round (get node_counts "max"))
              (round (get edge_counts "min"))
              (round (get edge_counts "mean") 1)
              (round (get edge_counts "max"))
-             (dim-str dim_node_features num_node_labels)
-             (dim-str dim_edge_features num_edge_labels)
+             (dim-str node_feature_dim node_label_count)
+             (dim-str edge_feature_dim edge_label_count)
              (round (get node_degrees "min"))
              (round (get node_degrees "mean") 1)
              (round (get node_degrees "std") 1)
              (round (get node_degrees "max"))
              (round (get radii "mean") 1)
-             (round (get radii "std") 1)]))
+             (round (get radii "std") 1)
+             (round (get triangles "min"))
+             (round (get triangles "mean") 1)
+             (round (get triangles "std") 1)
+             (round (get triangles "max"))]))
 
 (defn ds-stats->csv
   []
-  (let [stats (json/parse-string (slurp "data/stats.json"))
+  (let [stats (keep (fn [d]
+                      (try [d (-> d
+                                  (ds-stats)
+                                  (slurp)
+                                  (str/replace #"-?Infinity" "null")
+                                  (json/parse-string))]
+                        (catch Exception _ nil)))
+                    datasets)
         head (str "name,"
                   "graph_count,"
                   "node_count_min,node_count_mean,node_count_max,"
                   "edge_count_min,edge_count_mean,edge_count_max,"
                   "dim_node_features,dim_edge_features,"
                   "node_degree_min,node_degree_mean,node_degree_std,node_degree_max,"
-                  "radius_mean,radius_std")
+                  "radius_mean,radius_std,"
+                  "triangles_min,triangles_mean,triangles_std,triangles_max")
         stats (str head "\n" (str/join "\n" (map stats-dict->csv-line stats)) "\n")]
     (spit "./results/ds_stats.csv" stats)
     (println stats)))
-
-#_(defn extract-pool
-    [name]
-    (let [pool (if (str/includes? name "Avg") mean-pool sam-pool)]
-      pool
-      #_(if (str/ends-with? name "FC")
-          (str pool " + \\mathrm{MLP}")
-          pool)))
 
 (defn eval-name->params
   [dataset name]
@@ -169,7 +187,6 @@
 (defn to-proc
   [x]
   (or x 0))
-  ;(* 100 (or x 0)))
 
 (defn ls-dir
   [dir]
@@ -177,7 +194,8 @@
     (str/split out #"\n+")))
 
 (defn dataset-results
-  [dataset & {:keys [only-default] :or {only-default true}}]
+  [dataset & {:keys [only-default metric] :or {only-default true
+                                               metric :tau}}]
   (let [evals (ls-dir "./evaluations/")
         summaries (into []
                         (comp (filter #(and (str/starts-with? % dataset)
@@ -195,18 +213,18 @@
                               (keep (fn [{name :name
                                           config :config
                                           folds :folds
-                                          {test :tau} :combined_test
-                                          {train :tau} :combined_train
+                                          test :combined_test
+                                          train :combined_train
                                           done :done}]
                                       (when (or done (use-incomplete [dataset name]))
                                         {:name name
                                          :config config
-                                         :test-mean (to-proc (:mean test))
-                                         :test-std (to-proc (:std test))
-                                         :train-mean (to-proc (:mean train))
-                                         :train-std (to-proc (:std train))
-                                         :folds (map (fn [{{test :tau} :test}]
-                                                       {:test-mean (to-proc (:mean test))})
+                                         :test-mean (to-proc (:mean (metric test)))
+                                         :test-std (to-proc (:std (metric test)))
+                                         :train-mean (to-proc (:mean (metric train)))
+                                         :train-std (to-proc (:std (metric train)))
+                                         :folds (map (fn [{test :test}]
+                                                       {:test-mean (to-proc (:mean (metric test)))})
                                                      folds)}))))
                         evals)
         results (keep (fn [{name :name :as sum}]
@@ -273,6 +291,44 @@
     (spit (str "./results/" file ".csv") csv)
     (println csv)))
 
+(defn mae-result-csv
+  []
+  (let [datasets (filter #(str/starts-with? % "ogb") datasets)
+        results (sort-by :order (mapcat #(dataset-results % :metric :mean_absolute_error) datasets))
+        models-with-params (distinct (map (juxt :model :params :is-default) results))
+        _ (println (map :model results))
+        head (str "id;model;params;isDefault;" (str/join ";" (map dataset-result-head datasets)))
+        rows (into []
+                   (comp (filter #(not (or (str/includes? (first %) "Dr")
+                                           (str/includes? (first %) "Cmp"))))
+                         (map-indexed (partial dataset-result-row datasets results)))
+                   models-with-params)
+        csv (str head "\n" (str/join "\n" rows) "\n")]
+    (println csv)))
+
+(defn rank-utils->csv
+  [dir]
+  (doseq [ds datasets
+          :when (str/starts-with? ds "ogb")
+          :let [s (if (str/includes? ds "freesolv") 2 1) ; crude outlier fix
+                point-file (str "./evaluations/" ds "_WL2GNN/rank_utils.json")
+                pair-file (str "./evaluations/" ds "_DirectRankWL2GNN/rank_utils.json")
+                point-ranks (json/parse-string (slurp point-file) true)
+                pair-ranks (json/parse-string (slurp pair-file) true)
+                {target :target point :pred} (:train point-ranks)
+                {pair :pred} (:train pair-ranks)
+                f #(format "%.6f" %)
+                target (map f target)
+                point (map (comp f #(* % s)) point)
+                pair (map f pair)
+                head "i,target,point,pair"
+                rows (map #(str/join "," %&)
+                        (range) target point pair)
+                csv (str head "\n" (str/join "\n" rows) "\n")]]
+    (spit (str "./results/" dir "/" ds ".csv") csv)
+    (println ds "rank utils:")
+    (println csv)))
+
 #_(defn mean
     [vals]
     (/ (apply + vals) (count vals)))
@@ -282,16 +338,19 @@
     (let [m (mean vals)]
       [m (Math/sqrt
           (/ (apply + (map (comp #(* % %) #(- % m))
-                           vals))
+                       vals))
              (count vals)))]))
 
 (defn default-action
   []
   (ds-stats->csv)
-  (eval-results->csv {:only-default false} "results"))
+  (eval-results->csv {:only-default false} "results")
+  (rank-utils->csv "rank_utils"))
 
 (def actions {"ds_stats" ds-stats->csv
               "eval_res" (partial eval-results->csv {:only-default false} "results")
+              "mae_res" mae-result-csv
+              "rank_utils" (partial rank-utils->csv "rank_utils")
               nil default-action})
 
 (println "GRASPE Results Postprocessor.")

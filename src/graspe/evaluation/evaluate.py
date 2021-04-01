@@ -12,7 +12,7 @@ from tensorflow import keras
 import funcy as fy
 import tensorflow as tf
 
-from graspe.stats.utils import statistics
+from graspe.stats.utils import statistics, normalize
 from graspe.utils import tolerant, NumpyEncoder, make_dir
 import graspe.models.sort as model_sort
 import graspe.evaluation.summary as summary
@@ -188,7 +188,6 @@ def evaluate(
   inner_k = None
 
   model = model_factory.get_model()
-
   mf_name = model_factory.name
   ds_config = model_factory.config
   ds_name = ds_provider.full_name
@@ -474,42 +473,130 @@ def quick_evaluate(model_factory, ds_provider, **kwargs):
     epochs=1, repeat=1, winner_repeat=1, label="quick",
     **fy.omit(kwargs, ["epochs", "repeat", "winner_repeat", "label"]))
 
-def evaluate_epoch_time(model_factory, ds_provider, hp_args=None):
-  eval_dir = find_eval_dir(model_factory, ds_provider, "time_eval")
-  if not eval_dir.exists():
-    os.makedirs(eval_dir)
+def compute_ranking_utils(indices, provider_get, model, config):
+  print("Loading target rankings...")
+  _, object_rankings = provider_get(
+    enc="null_in", indices=indices, config=config)
+  norm_object_rankings = normalize(object_rankings)
 
-  log_dir_base = eval_dir / "logs"
-  times_file = eval_dir / "times.json"
+  enc = model.enc
+  in_enc = enc[0]
 
-  if not log_dir_base.exists():
-    os.makedirs(log_dir_base)
+  if "pref" in in_enc:
+    data_getter = provider_get(enc, config={
+      **config, "mode": "pivot_partitions"},
+      reconfigurable_finalization=True)
+    pivot_partitions = [
+      [i, i] for i in indices]
+    predicted_rankings = model.predict(data_getter(
+      pivot_partitions=pivot_partitions))
+  else:
+    predicted_rankings = model.predict(provider_get(
+      enc, config=config))
 
-  if times_file.exists():
-    print(f"Already evaluated times of {model_factory.name} on the dataset.")
+  norm_predicted_rankings = normalize(predicted_rankings)
+  sort_idx = np.argsort(object_rankings)
+  target_curve = norm_object_rankings[sort_idx]
+  pred_curve = norm_predicted_rankings[sort_idx]
+
+  return dict(
+    target=target_curve,
+    pred=pred_curve)
+
+def ranking_util_evaluate(
+  model_factory, ds_provider, split=None, label=None,
+  epochs=2000, single_hp=None,
+  selection_metric="tau", ignore_worst=0):
+  if ds_provider.default_split != 0 and split is None:
+    split = ds_provider.default_split
+
+  if split is None:
+    outer_idx = 0
+  elif split is True:
+    outer_idx = None
+  else:
+    outer_idx = split
+
+  ds_config = model_factory.config
+  model = model_factory.get_model()
+  util_model = getattr(model, "decomposed", None)
+
+  eval_dir = find_eval_dir(model_factory, ds_provider, label, split)
+  log_dir_base = make_dir(eval_dir / "rank_util_logs")
+  rankings_file = eval_dir / "rank_utils.json"
+
+  if rankings_file.exists():
+    print(f"Already existing ranking eval found at {rankings_file}.")
     return
 
-  hp_args = hp_args or dict()
-  model_ctr, hps = model_factory(ds_provider, **hp_args)
-  model = model_ctr(**list(hps)[0])
-  train_ds = ds_provider.get_all(output_type=model_factory.input_type)
+  prefer_in_enc = model_factory.prefer_in_enc
+  prefer_out_enc = model_factory.prefer_out_enc
+  encs = list(ds_provider.find_compatible_encodings(model))
+  if len(encs) > 1:
+    filtered_encs = list(fy.filter(
+      lambda enc: (
+        (prefer_in_enc is None or enc[0] == prefer_in_enc)
+        and (prefer_out_enc is None or enc[1] == prefer_out_enc)
+      ), encs))
+    if len(filtered_encs) > 0:
+      encs = filtered_encs
 
-  wc = int(np.sum([
-    keras.backend.count_params(w)
-    for w in model.trainable_weights]))
-  print(f"\nModel {model_factory.name} trainable weights = {wc}\n")
+  enc = encs[0]
+  model_ctr = fy.func_partial(
+    model, enc=enc, in_meta=ds_provider.in_meta,
+    out_meta=ds_provider.out_meta)
+  util_model_ctr = fy.func_partial(
+    util_model, enc=enc,
+    in_meta=ds_provider.in_meta,
+    out_meta=ds_provider.out_meta) if util_model else None
+  hps = model_factory.get_hyperparams(
+    enc, in_meta=ds_provider.in_meta, out_meta=ds_provider.out_meta)
 
-  _, times = train(
-    model, train_ds,
-    log_dir_base=log_dir_base,
-    epochs=110, patience=110,
-    measure_epoch_times=True)
+  train_ds, val_ds, test_ds = ds_provider.get_split(
+    enc, outer_idx=outer_idx, config=ds_config)
 
-  with open(times_file, "w") as f:
-    json.dump(
-      {
-        "summary": statistics(times[10:]),
-        "weight_count": wc,
-        "epoch_times": times
-      },
-      f, cls=NumpyEncoder, indent="\t")
+  train_idxs, val_idxs, test_idxs = ds_provider.get_split_indices(
+    outer_idx=outer_idx, relative=True)
+  train_get = fy.partial(ds_provider.get_train_split, outer_idx=outer_idx)
+  val_get = fy.partial(ds_provider.get_validation_split, outer_idx=outer_idx)
+  test_get = fy.partial(ds_provider.get_test_split, outer_idx=outer_idx)
+
+  if enc[-1] == "tf":
+    train_ds = train_ds.cache()
+    val_ds = val_ds.cache()
+
+  summ = summary.summarize_evaluation(
+    eval_dir, selection_metric=selection_metric, ignore_worst=ignore_worst)
+  best_hp_i = summ["folds"][0]["hp_i"]
+  best_hp = hps[best_hp_i]
+  m = model_ctr(**best_hp)
+
+  print(f"Created model with hp {best_hp_i} and enc {enc}. Training...")
+
+  if epochs > 0:
+    train(
+      m, train_ds, val_ds,
+      log_dir_base=log_dir_base,
+      epochs=epochs,
+      patience=300, restore_best=True)
+
+  print("Completed training. Computing rank curves...")
+  print(m.evaluate(test_ds))
+
+  if util_model_ctr is not None:
+    md = util_model_ctr(**best_hp) if util_model_ctr else m
+    md.set_weights(m.get_weights())
+  else:
+    md = m
+
+  with open(rankings_file, "w") as f:
+    rankings = dict(
+      train=compute_ranking_utils(train_idxs, train_get, md, ds_config),
+      val=compute_ranking_utils(val_idxs, val_get, md, ds_config),
+      test=compute_ranking_utils(test_idxs, test_get, md, ds_config))
+
+    json.dump(rankings, f, indent="\t", sort_keys=True, cls=NumpyEncoder)
+
+  tf.keras.backend.clear_session()
+  gc.collect()
+  print("Done.")

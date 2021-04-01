@@ -9,7 +9,7 @@ from datetime import datetime
 import graspe.datasets.provider as prov
 import graspe.datasets.synthetic.datasets as syn
 import graspe.datasets.tu.datasets as tu
-import graspe.datasets.ogb.datasets as ogb
+# import graspe.datasets.ogb.datasets as ogb
 import graspe.preprocessing.utils as enc_utils
 import graspe.preprocessing.graph.graph2vec as g2v
 import graspe.preprocessing.transformer as transformer
@@ -68,12 +68,16 @@ def experiment(
     fc_layer_args=fc_layer_args,
     cmp_layer_units=[edim],
     activation="sigmoid", inner_activation="relu",
-    # att_conv_activation="relu",
-    pooling="softmax",
-    learning_rate=0.0001,
+    att_conv_activation="sum",
+    # pooling="softmax",
+    learning_rate=0.001,
     # kernel="rbf",
     C=0.1)
   print("Instanciated model.")
+
+  if epochs == 0:
+    return m
+
   if provider.dataset_size < 10:
     ds_train = provider.get(enc, config=config)
     ds_val, ds_test = ds_train, ds_train
@@ -117,6 +121,7 @@ def sort_experiment(provider, model, **config):
     mode="train_random",
     neighbor_radius=2, sample_ratio=20,  # => ~4 comps. per graph (i.e. linear)
     min_distance=0.001, log=False, verbose=2, **config)
+
   train_idxs, val_idxs, test_idxs = provider.get_split_indices(relative=True)
   train_get = provider.get_train_split
   val_get = provider.get_validation_split
@@ -132,23 +137,37 @@ def sort_experiment(provider, model, **config):
 # provider = syn.triangle_classification_dataset()
 # provider = syn.triangle_count_dataset()
 # provider = syn.triangle_count_dataset(default_split="count_extrapolation")
-# provider = tu.ZINC_full(in_memory_cache=False)
+provider = tu.ZINC_full(in_memory_cache=False)
 # provider = tu.TRIANGLES(in_memory_cache=False)
 # provider = ogb.Mollipo()
-provider = ogb.Molfreesolv()
+# provider = ogb.Molfreesolv()
 
 # model = gnn.DirectRankGCN
 # model = gnn.CmpGIN
 # model = gnn.DirectRankGIN
 # model = gnn.DirectRankWL2GNN
 # model = gnn.WL2GNN
-model = gnn.GCN
+# model = gnn.GCN
 # model = svm.KernelSVM
 # model = svm.SVM
 # model = nn.MLP
 
+provider.stats
+
 # print("no feats:")
 # m = sort_experiment(provider, model, epochs=1000, T=5, prefer_in_enc="wlst", ignore_node_features=True, nystroem=500)
 # print()
-print("with feats:")
-sort_experiment(provider, model, epochs=1000, T=5, prefer_in_enc="wlst", ignore_node_features=False, nystroem=500)
+# print("with feats:")
+# m = experiment(provider, model, epochs=0, T=5, prefer_in_enc="wlst", ignore_node_features=False, nystroem=500)
+# md = experiment(provider, model.decomposed, epochs=0)
+#
+# # m.save_weights("/app/triangle_weights")
+# m.load_weights("/app/triangle_weights")
+# md.set_weights(m.get_weights())
+#
+# getter = provider.get_train_split(enc=m.enc, config=dict(mode="pivot_partitions"), reconfigurable_finalization=True)
+#
+# p1 = [50,40]
+# p2 = np.flip(p1)
+# d1, d2 = getter(pivot_partitions=[p1]), getter(pivot_partitions=[p2])
+# provider.get_train_split(indices=p1)[1], m.predict(d1), md.predict(d1), md.predict(d2), tf.sigmoid(md.predict(d2) - md.predict(d1))[0]

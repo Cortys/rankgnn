@@ -24,6 +24,15 @@ class PrefDiffLayer(keras.layers.Layer):
 
     return X_b - X_a
 
+class PrefFirstLayer(keras.layers.Layer):
+  def __init__(self):
+    super().__init__()
+
+  def call(self, input):
+    X_a, X_b = input
+
+    return X_a
+
 class PrefQuotientLayer(keras.layers.Layer):
   def __init__(self):
     super().__init__()

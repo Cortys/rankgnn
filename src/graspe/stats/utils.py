@@ -63,5 +63,7 @@ def find_stat_computer(type):
 
   return stat_computer.get(type, general_computer)
 
-def normalize(a):
-  return (a.astype('float64') - np.min(a)) / np.ptp(a)
+def normalize(a, ref=None):
+  if ref is None:
+    ref = a
+  return (a.astype('float64') - np.min(ref)) / np.ptp(ref)

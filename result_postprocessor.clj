@@ -307,15 +307,16 @@
     (println csv)))
 
 (defn rank-utils->csv
-  [dir]
-  (doseq [ds datasets
+  [dir model]
+  (doseq [:let [model-prefix (if (= model "wl2") "WL2GNN" "GIN")]
+          ds datasets
           :when (str/starts-with? ds "ogb")
-          :let [s (if (str/includes? ds "freesolv") 2 1) ; crude outlier fix
-                point-file (str "./evaluations/" ds "_WL2GNN/rank_utils.json")
-                pair-file (str "./evaluations/" ds "_DirectRankWL2GNN/rank_utils.json")
+          :let [s 1
+                point-file (str "./evaluations/" ds "_" model-prefix "/rank_utils.json")
+                pair-file (str "./evaluations/" ds "_DirectRank" model-prefix "/rank_utils.json")
                 point-ranks (json/parse-string (slurp point-file) true)
                 pair-ranks (json/parse-string (slurp pair-file) true)
-                {target :target point :pred} (:train point-ranks)
+                {target :target point :pred_aligned} (:train point-ranks)
                 {pair :pred} (:train pair-ranks)
                 f #(format "%.6f" %)
                 target (map f target)
@@ -325,8 +326,8 @@
                 rows (map #(str/join "," %&)
                         (range) target point pair)
                 csv (str head "\n" (str/join "\n" rows) "\n")]]
-    (spit (str "./results/" dir "/" ds ".csv") csv)
-    (println ds "rank utils:")
+    (spit (str "./results/" dir "_" model "/" ds ".csv") csv)
+    (println ds model "rank utils:")
     (println csv)))
 
 #_(defn mean
@@ -345,7 +346,8 @@
   []
   (ds-stats->csv)
   (eval-results->csv {:only-default false} "results")
-  (rank-utils->csv "rank_utils"))
+  (rank-utils->csv "rank_utils" "gin")
+  (rank-utils->csv "rank_utils" "wl2"))
 
 (def actions {"ds_stats" ds-stats->csv
               "eval_res" (partial eval-results->csv {:only-default false} "results")

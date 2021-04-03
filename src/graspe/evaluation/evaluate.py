@@ -495,13 +495,19 @@ def compute_ranking_utils(indices, provider_get, model, config):
       enc, config=config))
 
   norm_predicted_rankings = normalize(predicted_rankings)
+  tnorm_predicted_rankings = normalize(predicted_rankings, object_rankings)
   sort_idx = np.argsort(object_rankings)
   target_curve = norm_object_rankings[sort_idx]
   pred_curve = norm_predicted_rankings[sort_idx]
+  pred_curve_t = tnorm_predicted_rankings[sort_idx]
 
   return dict(
     target=target_curve,
-    pred=pred_curve)
+    pred=pred_curve,
+    pred_aligned=pred_curve_t,
+    raw_target=object_rankings[sort_idx],
+    raw_pred=predicted_rankings[sort_idx],
+    raw_pred_stats=statistics(predicted_rankings))
 
 def ranking_util_evaluate(
   model_factory, ds_provider, split=None, label=None,

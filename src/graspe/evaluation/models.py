@@ -41,7 +41,7 @@ def default_gnn_hyperparams(
 
   if "pref" in in_enc:
     fc_layer_args = [{-1: dict(activation=None)}]
-  elif out_enc == "binary":
+  elif out_enc == "binary" or out_enc == "rank_normalized":
     edim = 1
   elif out_enc == "float":
     edim = 1
@@ -83,7 +83,7 @@ def default_nn_hyperparams(
 
   if "pref" in in_enc:
     fc_layer_args = [{-1: dict(activation=None)}]
-  elif out_enc == "binary":
+  elif out_enc == "binary" or out_enc == "rank_normalized":
     edim = 1
   elif out_enc == "float":
     edim = 1
@@ -113,7 +113,11 @@ def default_svm_hyperparams():
 def GCN(enc, in_meta, out_meta):
   return default_gnn_hyperparams(enc)
 
-@model_factory(gnn.DirectRankGCN, )
+@model_factory(gnn.GCN, prefer_out_enc="rank_normalized")
+def GCN_rankn(enc, in_meta, out_meta):
+  return default_gnn_hyperparams(enc)
+
+@model_factory(gnn.DirectRankGCN)
 def DirectRankGCN(enc, in_meta, out_meta):
   return default_gnn_hyperparams(enc)
 
@@ -125,7 +129,11 @@ def CmpGCN(enc, in_meta, out_meta):
 def GIN(enc, in_meta, out_meta):
   return default_gnn_hyperparams(enc)
 
-@model_factory(gnn.DirectRankGIN, )
+@model_factory(gnn.GIN, prefer_out_enc="rank_normalized")
+def GIN_rankn(enc, in_meta, out_meta):
+  return default_gnn_hyperparams(enc)
+
+@model_factory(gnn.DirectRankGIN)
 def DirectRankGIN(enc, in_meta, out_meta):
   return default_gnn_hyperparams(enc)
 
@@ -135,6 +143,12 @@ def CmpGIN(enc, in_meta, out_meta):
 
 @model_factory(gnn.WL2GNN)
 def WL2GNN(enc, in_meta, out_meta):
+  return default_gnn_hyperparams(
+    enc,
+    conv_inner_activation=["relu"])
+
+@model_factory(gnn.WL2GNN, prefer_out_enc="rank_normalized")
+def WL2GNN_rankn(enc, in_meta, out_meta):
   return default_gnn_hyperparams(
     enc,
     conv_inner_activation=["relu"])

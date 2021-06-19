@@ -85,6 +85,7 @@ if __name__ == "__main__":
     else:
       ms = [
         "GCN", "GIN", "WL2GNN",
+        "GCN_rankn", "GIN_rankn", "WL2GNN_rankn",
         "DirectRankGCN", "DirectRankGIN", "DirectRankWL2GNN",
         "CmpGCN", "CmpGIN", "CmpWL2GNN",
         "WL_st_SVM"

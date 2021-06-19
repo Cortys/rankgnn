@@ -111,7 +111,7 @@ def evaluation_step(
   train_dur = t_end - t_start
   t_start = t_end
   train_res = model.evaluate(train_ds)
-  val_res = model.evaluate(val_ds)
+  val_res = model.evaluate(val_ds) if val_ds is not None else {}
   test_res = model.evaluate(test_ds)
   t_end = timer()
   eval_dur = t_end - t_start
@@ -325,9 +325,13 @@ def evaluate(
         train_ds, val_ds, test_ds = ds_provider.get_split(
           enc, outer_idx=outer_idx, config=ds_config)
 
+        if enc[1] == "rank_normalized":
+          val_ds = None  # Validation data not useful for early stopping here.
+
         if enc[-1] == "tf":
           train_ds = train_ds.cache()
-          val_ds = val_ds.cache()
+          if val_ds is not None:
+            val_ds = val_ds.cache()
         return train_ds, val_ds, test_ds
 
       load_evaluator = lambda model: sort_evaluator(

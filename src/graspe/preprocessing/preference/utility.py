@@ -1,5 +1,6 @@
 from abc import ABCMeta, abstractmethod
 import numpy as np
+import scipy as sp
 import collections
 
 import graspe.preprocessing.batcher as batcher
@@ -179,3 +180,15 @@ class UtilityPreferenceBatcher(batcher.Batcher, metaclass=ABCMeta):
 
   def finalize(self, batch):
     return batch.finalize(self.finalize_objects)
+
+class UtilityToNormalizedRankBatcher(batcher.Batcher):
+  name = "util_to_normalized_rank_batcher"
+
+  def preprocess(self, elements):
+    if len(elements) == 0:
+      return np.array([])
+    if len(elements) == 1:
+      return np.array([0.0])
+
+    ranks = sp.stats.rankdata(elements, method="dense") - 1
+    return np.true_divide(ranks, np.max(ranks))

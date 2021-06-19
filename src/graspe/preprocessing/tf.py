@@ -3,6 +3,7 @@ import tensorflow.keras as keras
 
 import graspe.utils as utils
 import graspe.preprocessing.preprocessor as preprocessor
+import graspe.preprocessing.preference.utility as pref_util
 import graspe.preprocessing.graph.wl1 as wl1_enc
 import graspe.preprocessing.graph.wl2 as wl2_enc
 import graspe.preprocessing.graph.graph2vec as g2v
@@ -66,6 +67,7 @@ encodings = dict(
   wl2_pref=pref(wl2),
   graph2vec=graph2vec,
   float=vec32,
+  rank_normalized=vec32,
   vector=vec32,
   binary=vec32,
   multiclass=multiclass
@@ -167,8 +169,16 @@ def create_graph_preprocessors(
     ("graph", "integer"), (name, "float", "tf"),
     encoder, batcher)
   create_preprocessor(
+    ("graph", "integer"), (name, "rank_normalized", "tf"),
+    encoder, batcher,
+    None, pref_util.UtilityToNormalizedRankBatcher)
+  create_preprocessor(
     ("graph", "float"), (name, "float", "tf"),
     encoder, batcher)
+  create_preprocessor(
+    ("graph", "float"), (name, "rank_normalized", "tf"),
+    encoder, batcher,
+    None, pref_util.UtilityToNormalizedRankBatcher)
   create_preprocessor(
     ("graph", "vector"), (name, "vector", "tf"),
     encoder, batcher)
@@ -200,7 +210,8 @@ def create_graph_preprocessors(
 
 vector_input_encodings = ["graph2vec"]
 graph_input_encodings = ["wl1", "wl2", "wl1_pref", "wl2_pref"]
-output_encodings = ["float", "vector", "binary", "multiclass"]
+output_encodings = [
+  "float", "vector", "rank_normalized", "binary", "multiclass"]
 
 create_graph_preprocessors(
   "graph2vec", g2v.Graph2VecEncoder)

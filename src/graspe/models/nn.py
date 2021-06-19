@@ -12,7 +12,8 @@ def inputs(in_enc, in_meta={}):
 
 @cm.model_step
 def finalize(input, out_enc, out_meta=None, squeeze_output=False):
-  if squeeze_output or out_enc == "binary" or out_enc == "float":
+  if squeeze_output or out_enc == "binary" or out_enc == "float" \
+      or out_enc == "rank_normalized":
     return tf.squeeze(input, -1)
   else:
     return input

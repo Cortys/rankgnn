@@ -9,7 +9,7 @@ from datetime import datetime
 import graspe.datasets.provider as prov
 import graspe.datasets.synthetic.datasets as syn
 import graspe.datasets.tu.datasets as tu
-# import graspe.datasets.ogb.datasets as ogb
+import graspe.datasets.ogb.datasets as ogb
 import graspe.preprocessing.utils as enc_utils
 import graspe.preprocessing.graph.graph2vec as g2v
 import graspe.preprocessing.transformer as transformer
@@ -43,7 +43,7 @@ def experiment(
   enc = encs[0]
   in_enc = enc[0]
   out_enc = enc[1]
-  dim = 32
+  dim = 64
   depth = 5
   fc_layer_args = None
 
@@ -52,7 +52,7 @@ def experiment(
   if "pref" in in_enc:
     edim = dim
     fc_layer_args = {-1: dict(activation=None)}
-  elif out_enc == "binary":
+  elif out_enc == "binary" or out_enc == "rank_normalized":
     edim = 1
   elif out_enc == "float":
     edim = 1
@@ -69,7 +69,7 @@ def experiment(
     cmp_layer_units=[edim],
     activation="sigmoid", inner_activation="relu",
     att_conv_activation="sum",
-    # pooling="softmax",
+    pooling="sum",
     learning_rate=0.001,
     # kernel="rbf",
     C=0.1)
@@ -135,11 +135,12 @@ def sort_experiment(provider, model, **config):
 
 
 # provider = syn.triangle_classification_dataset()
-# provider = syn.triangle_count_dataset()
+provider = syn.triangle_count_dataset()
 # provider = syn.triangle_count_dataset(default_split="count_extrapolation")
-provider = tu.ZINC_full(in_memory_cache=False)
+# provider = tu.ZINC_full(in_memory_cache=False)
 # provider = tu.TRIANGLES(in_memory_cache=False)
 # provider = ogb.Mollipo()
+# provider = ogb.Molesol()
 # provider = ogb.Molfreesolv()
 
 # model = gnn.DirectRankGCN
@@ -148,14 +149,17 @@ provider = tu.ZINC_full(in_memory_cache=False)
 # model = gnn.DirectRankWL2GNN
 # model = gnn.WL2GNN
 # model = gnn.GCN
+# model = gnn.GIN
 # model = svm.KernelSVM
 # model = svm.SVM
 # model = nn.MLP
 
-provider.stats
+# provider.stats
+
+# list(provider.get(("wl1", "rank_normalized", "tf")))[0][1]
 
 # print("no feats:")
-# m = sort_experiment(provider, model, epochs=1000, T=5, prefer_in_enc="wlst", ignore_node_features=True, nystroem=500)
+# m = sort_experiment(provider, model, epochs=1000, prefer_out_enc="rank_normalized")
 # print()
 # print("with feats:")
 # m = experiment(provider, model, epochs=0, T=5, prefer_in_enc="wlst", ignore_node_features=False, nystroem=500)

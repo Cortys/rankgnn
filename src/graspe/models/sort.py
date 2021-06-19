@@ -87,7 +87,7 @@ def evaluate_model_sort(indices, provider_get, model=None, enc=None, **config):
 
   if "pref" in in_enc:
     predicted_ordering = model_sort(indices, provider_get, enc=enc, **config)
-  elif out_enc == "float":
+  elif out_enc == "float" or out_enc == "rank_normalized":
     data = provider_get(enc, indices=indices, config=config)
 
     def predicted_ordering(model):

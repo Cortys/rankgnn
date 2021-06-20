@@ -39,6 +39,7 @@
                       ["ZINC_full_tu" "CmpGCN"]
                       ["ZINC_full_tu" "CmpGIN"]
                       ["ZINC_full_tu" "CmpWL2GNN"]
+                      ["ZINC_full_tu" "WL2GNN_rankn"]
                       ["triangle_count_dataset" "DirectRankWL2GNN"]
                       ["triangle_count_dataset" "CmpWL2GNN"]})
 
@@ -128,32 +129,32 @@
     (condp #(str/includes? %2 %1) n
       ; pair:
       "DirectRankGCN"
-      {:name "DrGCN" :order [1 0 0]
+      {:name "DirectRanker" :order [0 2 0]
        :pool ""
        :time-eval time-eval
        :is-default true}
       "DirectRankGIN"
-      {:name "DrGIN" :order [1 1 0]
+      {:name "DirectRanker" :order [1 2 0]
        :pool ""
        :time-eval time-eval
        :is-default true}
       "DirectRankWL2GNN"
-      {:name "2-WL-DrGNN" :order [1 2 r]
+      {:name "DirectRanker" :order [2 2 r]
        :pool ""
        :time-eval time-eval
        :is-default true}
       "CmpGCN"
-      {:name "CmpGCN" :order [1 3 0]
+      {:name "CmpNN" :order [0 3 0]
        :pool ""
        :time-eval time-eval
        :is-default true}
       "CmpGIN"
-      {:name "CmpGIN" :order [1 4 0]
+      {:name "CmpNN" :order [1 3 0]
        :pool ""
        :time-eval time-eval
        :is-default true}
       "CmpWL2GNN"
-      {:name "2-WL-CmpGNN" :order [1 5 r]
+      {:name "CmpNN" :order [2 3 r]
        :pool ""
        :time-eval time-eval
        :is-default true}
@@ -165,19 +166,36 @@
       ;  :T (or T 5)
       ;  :is-default true ; (or (= T 1) (= T 3))
       ;  :hide-diff (= T 1)}
+      "GCN_rankn"
+      {:name "Rank regr." :order [0 1 0]
+       :pool ""
+       :time-eval time-eval
+       :is-default true}
+      "GIN_rankn"
+      {:name "Rank regr." :order [1 1 0]
+       :pool ""
+       :time-eval time-eval
+       :is-default true}
+      "WL2GNN_rankn"
+      {:name "Rank regr."
+       :order [2 1 r]
+       :r r
+       :is-default (= r (single-depth-radii dataset))
+       :time-eval time-eval
+       :pool ""}
       "GCN"
-      {:name "GCN" :order [0 1 0]
+      {:name "Utility regr." :order [0 0 0]
        :pool ""
        :time-eval time-eval
        :is-default true}
       "GIN"
-      {:name "GIN" :order [0 2 0]
+      {:name "Utility regr." :order [1 0 0]
        :pool ""
        :time-eval time-eval
        :is-default true}
       "WL2GNN"
-      {:name "2-WL-GNN"
-       :order [0 3 r]
+      {:name "Utility regr."
+       :order [2 0 r]
        :r r
        :is-default (= r (single-depth-radii dataset))
        :time-eval time-eval
@@ -240,7 +258,8 @@
                                         :it (or (:it params) "")
                                         :T (:T params)
                                         :r (:r params)
-                                        :params "" #_(str/join ", " (keep params [:pool :it]))}))))
+                                        :params ""
+                                        #_(str/join ", " (keep params [:pool :it]))}))))
                       summaries)
         typed-max (fn ([] {}) ([x] x) ([max-dict [t v]] (update max-dict t (fnil max 0) v)))
         max-grouper (juxt (comp first :order) :is-default)
@@ -260,11 +279,12 @@
       (str pre "TestMean;" pre "TestStd;" pre "TrainMean;" pre "TrainStd"))))
 
 (defn dataset-result-row
-  [datasets results idx [model params is-default]]
+  [datasets results idx [model params is-default first-order]]
   (let [results (into {}
                       (comp (filter #(and (= (:model %) model)
                                           (= (:params %) params)
-                                          (= (:is-default %) is-default)))
+                                          (= (:is-default %) is-default)
+                                          (= (first (:order %)) first-order)))
                             (map (juxt :dataset identity)))
                       results)]
     (str idx ";" model ";" (when (seq params) (str params)) ";"
@@ -283,7 +303,7 @@
   [{:keys [only-default]} file & args]
   (let [datasets (if (empty? args) datasets args)
         results (sort-by :order (mapcat #(dataset-results % :only-default only-default) datasets))
-        models-with-params (distinct (map (juxt :model :params :is-default) results))
+        models-with-params (distinct (map (juxt :model :params :is-default (comp first :order)) results))
         _ (println (map :model results))
         head (str "id;model;params;isDefault;" (str/join ";" (map dataset-result-head datasets)))
         rows (into [] (map-indexed (partial dataset-result-row datasets results)) models-with-params)
@@ -295,7 +315,7 @@
   []
   (let [datasets (filter #(str/starts-with? % "ogb") datasets)
         results (sort-by :order (mapcat #(dataset-results % :metric :mean_absolute_error) datasets))
-        models-with-params (distinct (map (juxt :model :params :is-default) results))
+        models-with-params (distinct (map (juxt :model :params :is-default (comp first :order)) results))
         _ (println (map :model results))
         head (str "id;model;params;isDefault;" (str/join ";" (map dataset-result-head datasets)))
         rows (into []
@@ -313,18 +333,22 @@
           :when (str/starts-with? ds "ogb")
           :let [s 1
                 point-file (str "./evaluations/" ds "_" model-prefix "/rank_utils.json")
+                point2-file (str "./evaluations/" ds "_" model-prefix "_rankn/rank_utils.json")
                 pair-file (str "./evaluations/" ds "_DirectRank" model-prefix "/rank_utils.json")
                 point-ranks (json/parse-string (slurp point-file) true)
+                point2-ranks (json/parse-string (slurp point2-file) true)
                 pair-ranks (json/parse-string (slurp pair-file) true)
                 {target :target point :pred_aligned} (:train point-ranks)
+                {point2 :pred} (:train point2-ranks)
                 {pair :pred} (:train pair-ranks)
                 f #(format "%.6f" %)
                 target (map f target)
                 point (map (comp f #(* % s)) point)
+                point2 (map (comp f #(* % s)) point2)
                 pair (map f pair)
-                head "i,target,point,pair"
+                head "i,target,point,point2,pair"
                 rows (map #(str/join "," %&)
-                        (range) target point pair)
+                          (range) target point point2 pair)
                 csv (str head "\n" (str/join "\n" rows) "\n")]]
     (spit (str "./results/" dir "_" model "/" ds ".csv") csv)
     (println ds model "rank utils:")

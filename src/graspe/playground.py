@@ -68,8 +68,9 @@ def experiment(
     fc_layer_args=fc_layer_args,
     cmp_layer_units=[edim],
     activation="sigmoid", inner_activation="relu",
-    att_conv_activation="sum",
-    pooling="sum",
+    att_conv_activation="sigmoid",
+    # pooling="sum",
+    pooling="softmax",
     learning_rate=0.001,
     # kernel="rbf",
     C=0.1)
@@ -146,13 +147,16 @@ provider = syn.triangle_count_dataset()
 # model = gnn.DirectRankGCN
 # model = gnn.CmpGIN
 # model = gnn.DirectRankGIN
-# model = gnn.DirectRankWL2GNN
+model = gnn.DirectRankWL2GNN
 # model = gnn.WL2GNN
 # model = gnn.GCN
 # model = gnn.GIN
 # model = svm.KernelSVM
 # model = svm.SVM
 # model = nn.MLP
+
+m = experiment(provider, model, epochs=0)
+m.summary()
 
 # provider.stats
 

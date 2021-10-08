@@ -379,7 +379,7 @@
               "rank_utils" (partial rank-utils->csv "rank_utils")
               nil default-action})
 
-(println "GRASPE Results Postprocessor.")
+(println "RGNN Results Postprocessor.")
 (if-let [action (actions (first *command-line-args*))]
   (apply action (rest *command-line-args*))
   (println "Unknown action:" (first *command-line-args*)))

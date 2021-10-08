@@ -6,8 +6,8 @@ if [ "$1" == "root" ]; then
 	USER="-u 0:0"
 fi
 
-if [ -z "$GRASPE_CONTAINER_NAME" ]; then
-	GRASPE_CONTAINER_NAME="graspe"
+if [ -z "$RGNN_CONTAINER_NAME" ]; then
+	RGNN_CONTAINER_NAME="rgnn"
 fi
 
-docker exec -it $USER $(docker ps -aqf "name=^$GRASPE_CONTAINER_NAME\$") bash
+docker exec -it $USER $(docker ps -aqf "name=^$RGNN_CONTAINER_NAME\$") bash

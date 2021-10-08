@@ -5,8 +5,8 @@ USER="-u $(id -u):$(id -g)"
 
 LOGDIR="/app/${1:-logs}"
 
-if [ -z "$GRASPE_CONTAINER_NAME" ]; then
-	GRASPE_CONTAINER_NAME="graspe"
+if [ -z "$RGNN_CONTAINER_NAME" ]; then
+	RGNN_CONTAINER_NAME="rgnn"
 fi
 
 # trap 'kill %1; exit 0' SIGINT
@@ -15,7 +15,7 @@ fi
 TB_PORT=6006
 TB_URL="http://localhost:$TB_PORT"
 echo "Starting TensorBoard at ${TB_URL} ..."
-docker exec -it $USER $(docker ps -aqf "name=^$GRASPE_CONTAINER_NAME\$") tensorboard --logdir $LOGDIR --bind_all #&
+docker exec -it $USER $(docker ps -aqf "name=^$RGNN_CONTAINER_NAME\$") tensorboard --logdir $LOGDIR --bind_all #&
 
 # while true; do
 # 	read in
